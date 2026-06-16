@@ -78,17 +78,6 @@ const MainLayout = () => {
         </div>
 
         <div className="top-bar-right">
-          {/* Contadores en vivo */}
-          <div className="stats-indicators">
-            <div className="stat-pill">
-              <Package size={14} />
-              <span>{totalProducts}</span>
-            </div>
-            <div className="stat-pill">
-              <Truck size={14} />
-              <span>{totalShipments}</span>
-            </div>
-          </div>
 
           {/* Usuario */}
           <div className="user-menu-container">
