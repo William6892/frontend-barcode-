@@ -13,17 +13,40 @@ import Scanner from './pages/Scanner/Scanner';
 import Audit from './pages/Audit/Audit';
 import Users from "./pages/Users/Users";
 
+// ✅ Función para obtener rol del token
+const getRoleFromToken = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] 
+      || payload.role 
+      || payload['role'];
+  } catch (e) {
+    console.error('Error decodificando token:', e);
+    return null;
+  }
+};
+
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return children;
 };
 
-// 👇 NUEVO: Solo para Admin
+// ✅ AdminRoute mejorado - lee el rol del token
 const AdminRoute = ({ children }) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role !== 'Admin') return <Navigate to="/dashboard" replace />;
+  
+  const role = getRoleFromToken();
+  console.log('🔍 AdminRoute - Rol del token:', role);
+  
+  if (role?.toLowerCase() !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
   return children;
 };
 

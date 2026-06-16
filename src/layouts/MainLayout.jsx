@@ -11,16 +11,37 @@ import { api } from '../services/api';
 import './MainLayout.css';
 
 const MainLayout = () => {
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [totalProducts, setTotalProducts] = useState(0);
   const [totalShipments, setTotalShipments] = useState(0);
+  const [userData, setUserData] = useState({ username: 'Administrador', role: 'Admin' });
 
-  // ✅ Verificar si es Admin
-  const isAdmin = user?.role === 'Admin';
+  // ✅ Obtener datos del token (seguro, sin guardar en localStorage)
+  const getUserDataFromToken = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return { username: 'Administrador', role: 'Admin' };
+    
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return {
+        username: payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] 
+          || payload.username 
+          || 'Administrador',
+        role: payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] 
+          || payload.role 
+          || 'Admin'
+      };
+    } catch (e) {
+      console.error('Error decodificando token:', e);
+      return { username: 'Administrador', role: 'Admin' };
+    }
+  };
 
   useEffect(() => {
+    const data = getUserDataFromToken();
+    setUserData(data);
     loadStats();
   }, []);
 
@@ -41,7 +62,10 @@ const MainLayout = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  // ✅ Items de navegación - Usuarios solo si es Admin
+  // ✅ Determinar si es Admin desde el token
+  const isAdmin = userData.role?.toLowerCase() === 'admin';
+
+  // ✅ Items de navegación
   const navItems = [
     { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
     { to: '/shipments/new', icon: <Truck size={20} />, label: 'Envíos' },
@@ -49,7 +73,6 @@ const MainLayout = () => {
     { to: '/audit', icon: <FileSearch size={20} />, label: 'Auditoría' },
   ];
 
-  // ✅ Agregar Usuarios solo si es Admin
   if (isAdmin) {
     navItems.push({ to: '/users', icon: <User size={20} />, label: 'Usuarios' });
   }
@@ -86,7 +109,6 @@ const MainLayout = () => {
         </div>
 
         <div className="top-bar-right">
-          {/* Estadísticas en vivo */}
           <div className="stats-indicators">
             <div className="stat-pill">
               <Package size={14} />
@@ -98,18 +120,17 @@ const MainLayout = () => {
             </div>
           </div>
 
-          {/* Usuario */}
           <div className="user-menu-container">
             <button 
               className="user-menu-btn"
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
               <div className="user-avatar-small">
-                {getInitials(user?.name)}
+                {getInitials(userData.username)}
               </div>
               <div className="user-info-top">
-                <span className="user-name-top">{user?.name || 'Administrador'}</span>
-                <span className="user-role-top">{user?.role || 'Admin'}</span>
+                <span className="user-name-top">{userData.username}</span>
+                <span className="user-role-top">{userData.role}</span>
               </div>
               <ChevronDown size={16} className={`chevron ${showUserMenu ? 'rotated' : ''}`} />
             </button>
@@ -118,11 +139,11 @@ const MainLayout = () => {
               <div className="user-dropdown">
                 <div className="dropdown-header">
                   <div className="dropdown-avatar">
-                    {getInitials(user?.name)}
+                    {getInitials(userData.username)}
                   </div>
                   <div>
-                    <div className="dropdown-name">{user?.name || 'Administrador'}</div>
-                    <div className="dropdown-role">{user?.role || 'Admin'}</div>
+                    <div className="dropdown-name">{userData.username}</div>
+                    <div className="dropdown-role">{userData.role}</div>
                   </div>
                 </div>
                 <div className="dropdown-divider" />
@@ -136,7 +157,6 @@ const MainLayout = () => {
         </div>
       </header>
 
-      {/* CONTENIDO PRINCIPAL */}
       <div className="main-container">
         <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
           <nav className="nav-menu">
