@@ -2,48 +2,45 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import './Users.css';
 import {
   Edit, Trash2, UserCheck, UserX, Plus, RefreshCw,
   ArrowLeft, Save, User, Mail, Lock, Shield, Search,
-  Users as UsersIcon
+  Users as UsersIcon, Eye, ClipboardCheck, BarChart2,
 } from 'lucide-react';
 
-const getRoleBadge = (role) => {
-  const styles = {
-    Admin:      'bg-blue-50 text-blue-700',
-    Supervisor: 'bg-purple-50 text-purple-700',
-    Inspector:  'bg-green-50 text-green-700',
-    Auditor:    'bg-amber-50 text-amber-700',
-  };
-  return styles[role] || 'bg-gray-100 text-gray-600';
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const ROLE_CONFIG = {
+  Admin:      { avatar: 'av--admin',      badge: 'rb--admin',      icon: <Shield      size={11} /> },
+  Supervisor: { avatar: 'av--supervisor', badge: 'rb--supervisor', icon: <BarChart2   size={11} /> },
+  Inspector:  { avatar: 'av--inspector',  badge: 'rb--inspector',  icon: <Eye         size={11} /> },
+  Auditor:    { avatar: 'av--auditor',    badge: 'rb--auditor',    icon: <ClipboardCheck size={11} /> },
 };
 
-const getAvatarColors = (role) => {
-  const styles = {
-    Admin:      'bg-blue-50 text-blue-700',
-    Supervisor: 'bg-purple-50 text-purple-700',
-    Inspector:  'bg-green-50 text-green-700',
-    Auditor:    'bg-amber-50 text-amber-700',
-  };
-  return styles[role] || 'bg-gray-100 text-gray-600';
+const getConfig  = (role) => ROLE_CONFIG[role] ?? {};
+const getInitials = (name) => {
+  const parts = name?.trim().split(' ') ?? [];
+  return parts.length >= 2
+    ? parts[0][0].toUpperCase() + parts[1][0].toUpperCase()
+    : (parts[0]?.[0] ?? '?').toUpperCase();
 };
-
-const getInitials = (name) => name.charAt(0).toUpperCase();
 
 // ─── Form ────────────────────────────────────────────────────────────────────
 
 const UserForm = ({ editingUser, onClose, onSaved, onCreated }) => {
   const [formData, setFormData] = useState({
-    username:        editingUser?.username        || '',
-    email:           editingUser?.email           || '',
+    username:        editingUser?.username || '',
+    email:           editingUser?.email    || '',
     password:        '',
     confirmPassword: '',
-    role:            editingUser?.role            || 'Inspector',
+    role:            editingUser?.role     || 'Inspector',
   });
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
 
-  const set = (key) => (e) => setFormData((prev) => ({ ...prev, [key]: e.target.value }));
+  const set = (key) => (e) =>
+    setFormData((prev) => ({ ...prev, [key]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -85,57 +82,50 @@ const UserForm = ({ editingUser, onClose, onSaved, onCreated }) => {
     }
   };
 
-  const inputClass =
-    'input-field w-full';
-
   return (
-    <div className="p-6 max-w-lg mx-auto">
-      <button
-        onClick={onClose}
-        className="flex items-center gap-1.5 text-sm text-muted hover:text-primary mb-6 transition-colors"
-      >
-        <ArrowLeft size={16} /> Volver
+    <div className="uf-page">
+      <button className="uf-back" onClick={onClose}>
+        <ArrowLeft size={14} />
+        Volver
       </button>
 
-      <div className="glass-panel p-7">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-            {editingUser ? <Edit size={18} className="text-primary" /> : <UsersIcon size={18} className="text-primary" />}
+      <div className="uf-card">
+        <div className="uf-card-header">
+          <div className="uf-card-icon">
+            {editingUser ? <Edit size={16} /> : <UsersIcon size={16} />}
           </div>
           <div>
-            <h1 className="text-lg font-semibold">
+            <h2 className="uf-card-title">
               {editingUser ? 'Editar usuario' : 'Nuevo usuario'}
-            </h1>
-            <p className="text-xs text-muted">
-              {editingUser ? 'Actualiza los datos del usuario' : 'Registra un nuevo usuario en el sistema'}
+            </h2>
+            <p className="uf-card-subtitle">
+              {editingUser
+                ? 'Actualiza los datos del usuario'
+                : 'Registra un nuevo usuario en el sistema'}
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-100 text-danger text-sm px-4 py-3 rounded-xl">
-              {error}
-            </div>
-          )}
+        <form onSubmit={handleSubmit} className="uf-form">
+          {error && <div className="uf-alert">{error}</div>}
 
-          <div className="input-group">
-            <label className="input-label">Usuario *</label>
-            <div className="relative">
-              <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <div className="uf-field">
+            <label className="uf-label">Usuario *</label>
+            <div className="uf-input-wrap">
+              <User size={14} className="uf-input-icon" />
               <input
-                type="text" className={inputClass} placeholder="Nombre de usuario"
+                type="text" className="uf-input" placeholder="Nombre de usuario"
                 value={formData.username} onChange={set('username')} required
               />
             </div>
           </div>
 
-          <div className="input-group">
-            <label className="input-label">Email *</label>
-            <div className="relative">
-              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <div className="uf-field">
+            <label className="uf-label">Email *</label>
+            <div className="uf-input-wrap">
+              <Mail size={14} className="uf-input-icon" />
               <input
-                type="email" className={inputClass} placeholder="correo@ejemplo.com"
+                type="email" className="uf-input" placeholder="correo@ejemplo.com"
                 value={formData.email} onChange={set('email')} required
               />
             </div>
@@ -143,22 +133,22 @@ const UserForm = ({ editingUser, onClose, onSaved, onCreated }) => {
 
           {!editingUser && (
             <>
-              <div className="input-group">
-                <label className="input-label">Contraseña *</label>
-                <div className="relative">
-                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <div className="uf-field">
+                <label className="uf-label">Contraseña *</label>
+                <div className="uf-input-wrap">
+                  <Lock size={14} className="uf-input-icon" />
                   <input
-                    type="password" className={inputClass} placeholder="Mínimo 6 caracteres"
+                    type="password" className="uf-input" placeholder="Mínimo 6 caracteres"
                     value={formData.password} onChange={set('password')} required
                   />
                 </div>
               </div>
-              <div className="input-group">
-                <label className="input-label">Confirmar contraseña *</label>
-                <div className="relative">
-                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <div className="uf-field">
+                <label className="uf-label">Confirmar contraseña *</label>
+                <div className="uf-input-wrap">
+                  <Lock size={14} className="uf-input-icon" />
                   <input
-                    type="password" className={inputClass} placeholder="Repite la contraseña"
+                    type="password" className="uf-input" placeholder="Repite la contraseña"
                     value={formData.confirmPassword} onChange={set('confirmPassword')} required
                   />
                 </div>
@@ -166,14 +156,11 @@ const UserForm = ({ editingUser, onClose, onSaved, onCreated }) => {
             </>
           )}
 
-          <div className="input-group">
-            <label className="input-label">Rol</label>
-            <div className="relative">
-              <Shield size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <select
-                className={inputClass + ' appearance-none cursor-pointer'}
-                value={formData.role} onChange={set('role')}
-              >
+          <div className="uf-field">
+            <label className="uf-label">Rol</label>
+            <div className="uf-input-wrap">
+              <Shield size={14} className="uf-input-icon" />
+              <select className="uf-input uf-select" value={formData.role} onChange={set('role')}>
                 <option value="Admin">Admin</option>
                 <option value="Supervisor">Supervisor</option>
                 <option value="Inspector">Inspector</option>
@@ -182,18 +169,12 @@ const UserForm = ({ editingUser, onClose, onSaved, onCreated }) => {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button" onClick={onClose}
-              className="btn btn-glass flex-1"
-            >
+          <div className="uf-actions">
+            <button type="button" className="btn btn--ghost" onClick={onClose}>
               Cancelar
             </button>
-            <button
-              type="submit" disabled={loading}
-              className="btn btn-primary flex-1"
-            >
-              <Save size={16} />
+            <button type="submit" className="btn btn--primary" disabled={loading}>
+              <Save size={14} />
               {loading ? 'Guardando…' : editingUser ? 'Actualizar' : 'Crear usuario'}
             </button>
           </div>
@@ -221,28 +202,27 @@ const Users = () => {
       setLoading(true);
       setError(null);
       const res = await api.get('/users');
-      console.log('Respuesta:', res);
-      if (res.success) {
-        setUsers(res.data);
-      } else {
-        setError('Error al cargar usuarios');
-      }
+      if (res.success) setUsers(res.data);
+      else setError('Error al cargar usuarios');
     } catch (err) {
-      console.error('Error:', err);
       setError(err.message || 'Error al cargar usuarios');
     } finally {
       setLoading(false);
     }
   };
 
-  const filtered = users.filter((u) =>
-    u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = users.filter((u) => {
+    const q = searchTerm.toLowerCase();
+    return u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
 
-  const openCreate = () => { setEditingUser(null); setShowForm(true); };
-  const openEdit   = (u)  => { setEditingUser(u);   setShowForm(true); };
-  const closeForm  = ()   => { setShowForm(false);  setEditingUser(null); };
+  const activeCount   = users.filter((u) => u.IsActive).length;
+  const inactiveCount = users.length - activeCount;
+  const adminCount    = users.filter((u) => u.role === 'Admin').length;
+
+  const openCreate = ()  => { setEditingUser(null); setShowForm(true); };
+  const openEdit   = (u) => { setEditingUser(u);    setShowForm(true); };
+  const closeForm  = ()  => { setShowForm(false);   setEditingUser(null); };
 
   const handleSaved = (updated) =>
     setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
@@ -252,12 +232,8 @@ const Users = () => {
   const handleDelete = async (id, username) => {
     if (!window.confirm(`¿Eliminar al usuario "${username}"?`)) return;
     try {
-      const res = await api.delete(`/users/${id}`);
-      if (res.success || res.message || res === '' || res?.status === 204) {
-        setUsers((prev) => prev.filter((u) => u.id !== id));
-      } else {
-        setUsers((prev) => prev.filter((u) => u.id !== id));
-      }
+      await api.delete(`/users/${id}`);
+      setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (err) {
       alert(err.message || 'Error al eliminar');
     }
@@ -269,9 +245,10 @@ const Users = () => {
     try {
       const endpoint = isActive ? `/users/${id}/deactivate` : `/users/${id}/activate`;
       const res = await api.post(endpoint);
-      if (res.success) {
-        setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, IsActive: !isActive } : u)));
-      }
+      if (res.success)
+        setUsers((prev) =>
+          prev.map((u) => (u.id === id ? { ...u, IsActive: !isActive } : u))
+        );
     } catch (err) {
       alert(err.message || `Error al ${action}`);
     }
@@ -279,8 +256,8 @@ const Users = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-primary" />
+      <div className="users-loading">
+        <div className="users-spinner" />
       </div>
     );
   }
@@ -297,157 +274,155 @@ const Users = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="users-page">
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div className="users-header">
         <div>
-          <h1 className="text-xl font-semibold flex items-center gap-2">
-            <UsersIcon size={22} className="text-muted" />
+          <h1 className="users-title">
+            <UsersIcon size={20} className="users-title__icon" aria-hidden="true" />
             Usuarios
           </h1>
-          <p className="text-sm text-muted mt-0.5">Gestiona los usuarios del sistema</p>
+          <p className="users-subtitle">Gestiona los accesos y roles del sistema</p>
         </div>
 
-        <div className="flex gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-none">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+        <div className="users-toolbar">
+          <div className="search-wrap">
+            <Search size={14} className="search-wrap__icon" aria-hidden="true" />
             <input
               type="text"
               placeholder="Buscar usuario…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-field w-full sm:w-52 pl-9"
+              className="search-input"
+              aria-label="Buscar usuario"
             />
           </div>
-
-          <button
-            onClick={loadUsers}
-            className="btn btn-glass"
-            title="Actualizar"
-          >
-            <RefreshCw size={16} />
+          <button onClick={loadUsers} className="btn btn--icon" title="Actualizar" aria-label="Actualizar lista">
+            <RefreshCw size={14} />
           </button>
-
           {isAdmin && (
-            <button
-              onClick={openCreate}
-              className="btn btn-primary"
-            >
-              <Plus size={16} /> Nuevo
+            <button onClick={openCreate} className="btn btn--primary">
+              <Plus size={14} /> Nuevo usuario
             </button>
           )}
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-danger text-sm px-4 py-3 rounded-xl mb-4">
-          {error}
+      {/* Stats */}
+      <div className="users-stats">
+        <div className="stat-card">
+          <span className="stat-card__val">{users.length}</span>
+          <span className="stat-card__lbl"><UsersIcon size={12} aria-hidden="true" /> Total usuarios</span>
         </div>
-      )}
+        <div className="stat-card">
+          <span className="stat-card__val stat-card__val--active">{activeCount}</span>
+          <span className="stat-card__lbl stat-card__lbl--active"><UserCheck size={12} aria-hidden="true" /> Activos</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-card__val stat-card__val--inactive">{inactiveCount}</span>
+          <span className="stat-card__lbl"><UserX size={12} aria-hidden="true" /> Inactivos</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-card__val stat-card__val--admin">{adminCount}</span>
+          <span className="stat-card__lbl stat-card__lbl--admin"><Shield size={12} aria-hidden="true" /> Admins</span>
+        </div>
+      </div>
+
+      {error && <div className="uf-alert" style={{ marginBottom: '1rem' }}>{error}</div>}
 
       {/* Table */}
-      <div className="glass-panel overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+      <div className="users-panel">
+        <div className="users-table-wrap">
+          <table className="users-table">
             <thead>
-              <tr className="border-b border-border-glass">
-                {['Usuario', 'Email', 'Rol', 'Estado', ''].map((h, i) => (
-                  <th
-                    key={i}
-                    className={`px-5 py-3.5 text-xs font-medium text-muted uppercase tracking-wider ${i === 4 ? 'text-right' : 'text-left'}`}
-                  >
-                    {h}
-                  </th>
-                ))}
+              <tr>
+                <th>Usuario</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                {isAdmin && <th className="col-actions" />}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border-glass">
-              {filtered.map((user) => (
-                <tr key={user.id} className="hover:bg-surface-hover transition-colors">
-
-                  {/* Usuario */}
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-semibold flex-shrink-0 ${getAvatarColors(user.role)}`}>
-                        {getInitials(user.username)}
+            <tbody>
+              {filtered.map((user) => {
+                const cfg = getConfig(user.role);
+                return (
+                  <tr key={user.id} className="users-row">
+                    <td>
+                      <div className="user-cell">
+                        <div className={`av ${cfg.avatar}`}>{getInitials(user.username)}</div>
+                        <div>
+                          <span className="user-name">{user.username}</span>
+                          <span className="user-id">ID · {user.id}</span>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-sm font-medium">{user.username}</div>
-                        <div className="text-xs text-muted">ID: {user.id}</div>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Email */}
-                  <td className="px-5 py-3.5 text-sm text-secondary">{user.email}</td>
-
-                  {/* Rol */}
-                  <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-lg ${getRoleBadge(user.role)}`}>
-                      {user.role}
-                    </span>
-                  </td>
-
-                  {/* Estado */}
-                  <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${user.IsActive ? 'text-success' : 'text-danger'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${user.IsActive ? 'bg-success' : 'bg-danger'}`} />
-                      {user.IsActive ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-
-                  {/* Acciones */}
-                  <td className="px-5 py-3.5">
+                    </td>
+                    <td className="cell-email">{user.email}</td>
+                    <td>
+                      <span className={`rb ${cfg.badge}`}>
+                        {cfg.icon}
+                        {user.role}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`sp ${user.IsActive ? 'sp--active' : 'sp--inactive'}`}>
+                        <span className="sp__dot" />
+                        {user.IsActive ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
                     {isAdmin && (
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => openEdit(user)}
-                          className="p-1.5 text-muted hover:text-primary hover:bg-primary-glow rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Edit size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(user.id, user.IsActive, user.username)}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            user.IsActive
-                              ? 'text-muted hover:text-warning hover:bg-warning-bg'
-                              : 'text-muted hover:text-success hover:bg-success-bg'
-                          }`}
-                          title={user.IsActive ? 'Desactivar' : 'Activar'}
-                        >
-                          {user.IsActive ? <UserX size={15} /> : <UserCheck size={15} />}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(user.id, user.username)}
-                          className="p-1.5 text-muted hover:text-danger hover:bg-danger-bg rounded-lg transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            onClick={() => openEdit(user)}
+                            className="ab"
+                            title="Editar"
+                            aria-label={`Editar ${user.username}`}
+                          >
+                            <Edit size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleToggle(user.id, user.IsActive, user.username)}
+                            className="ab ab--toggle"
+                            title={user.IsActive ? 'Desactivar' : 'Activar'}
+                            aria-label={`${user.IsActive ? 'Desactivar' : 'Activar'} ${user.username}`}
+                          >
+                            {user.IsActive ? <UserX size={13} /> : <UserCheck size={13} />}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(user.id, user.username)}
+                            className="ab ab--danger"
+                            title="Eliminar"
+                            aria-label={`Eliminar ${user.username}`}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
                     )}
-                  </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         {filtered.length === 0 && (
-          <div className="text-center py-14">
-            <UsersIcon size={32} className="mx-auto text-muted mb-3" />
-            <p className="text-sm text-muted">
+          <div className="users-empty">
+            <UsersIcon size={28} className="users-empty__icon" aria-hidden="true" />
+            <p className="users-empty__text">
               {searchTerm ? 'No se encontraron usuarios' : 'No hay usuarios registrados'}
             </p>
           </div>
         )}
       </div>
 
-      <div className="mt-3 text-xs text-muted">
+      <p className="users-footer">
         {filtered.length} usuario{filtered.length !== 1 ? 's' : ''}
         {searchTerm && ` de ${users.length} en total`}
-      </div>
+        {!searchTerm && ` · ${activeCount} activo${activeCount !== 1 ? 's' : ''} · ${inactiveCount} inactivo${inactiveCount !== 1 ? 's' : ''}`}
+      </p>
     </div>
   );
 };
