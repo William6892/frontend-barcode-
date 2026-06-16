@@ -1,4 +1,4 @@
-// layouts/MainLayout.jsx - VERSIÓN SIMPLE
+// layouts/MainLayout.jsx
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,16 +17,19 @@ const MainLayout = () => {
   const [totalProducts, setTotalProducts] = useState(0);
   const [totalShipments, setTotalShipments] = useState(0);
 
+  // ✅ Verificar si es Admin
+  const isAdmin = user?.role === 'Admin';
+
   useEffect(() => {
     loadStats();
   }, []);
 
   const loadStats = async () => {
     try {
-      const stats = await api.get('/shipments/stats');
-      if (stats.success) {
-        setTotalProducts(stats.totalProducts || 0);
-        setTotalShipments(stats.totalShipments || 0);
+      const stats = await api.get('/Shipment/dashboard/stats');
+      if (stats) {
+        setTotalProducts(stats.totalProductsScannedToday || 0);
+        setTotalShipments(stats.totalShipmentsToday || 0);
       }
     } catch (error) {
       console.error('Error cargando estadísticas:', error);
@@ -38,13 +41,18 @@ const MainLayout = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  // ✅ Items de navegación - Usuarios solo si es Admin
   const navItems = [
     { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
     { to: '/shipments/new', icon: <Truck size={20} />, label: 'Envíos' },
     { to: '/scanner', icon: <ScanLine size={20} />, label: 'Escáner' },
     { to: '/audit', icon: <FileSearch size={20} />, label: 'Auditoría' },
-    { to: '/users', icon: <User size={20} />, label: 'Usuarios' },
   ];
+
+  // ✅ Agregar Usuarios solo si es Admin
+  if (isAdmin) {
+    navItems.push({ to: '/users', icon: <User size={20} />, label: 'Usuarios' });
+  }
 
   return (
     <div className="main-layout">
@@ -78,6 +86,17 @@ const MainLayout = () => {
         </div>
 
         <div className="top-bar-right">
+          {/* Estadísticas en vivo */}
+          <div className="stats-indicators">
+            <div className="stat-pill">
+              <Package size={14} />
+              <span>{totalProducts}</span>
+            </div>
+            <div className="stat-pill">
+              <Truck size={14} />
+              <span>{totalShipments}</span>
+            </div>
+          </div>
 
           {/* Usuario */}
           <div className="user-menu-container">
@@ -132,6 +151,12 @@ const MainLayout = () => {
               </NavLink>
             ))}
           </nav>
+          <div className="sidebar-footer">
+            <button onClick={logout} className="logout-btn">
+              <LogOut size={20} />
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
         </aside>
 
         <main className="main-content">

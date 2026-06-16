@@ -19,6 +19,14 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+// 👇 NUEVO: Solo para Admin
+const AdminRoute = ({ children }) => {
+  const { isAuthenticated, user } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.role !== 'Admin') return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
 function AppRoutes() {
   return (
     <Routes>
@@ -32,7 +40,11 @@ function AppRoutes() {
         <Route path="/shipments/new" element={<ShipmentCreation />} />
         <Route path="/scanner" element={<Scanner />} />
         <Route path="/audit" element={<Audit />} />
-        <Route path="/users" element={<Users />} /> 
+        <Route path="/users" element={
+          <AdminRoute>
+            <Users />
+          </AdminRoute>
+        } />
       </Route>
     </Routes>
   );
