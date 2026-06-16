@@ -324,3 +324,30 @@ p {
     font-size: 0.875rem;
   }
 }
+/* 👇 ESTO HACE QUE TODO SE AJUSTE SOLO */
+.main-container,
+.main-content,
+.shipment-creation-wrapper,
+.shipment-creation {
+  max-width: 100% !important;
+  width: 100% !important;
+  overflow-x: auto !important;
+}
+
+.main-content {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+}
+
+.product-fields {
+  flex-wrap: wrap !important;
+}
+
+.product-input {
+  min-width: 120px !important;
+  flex: 1 1 auto !important;
+}
