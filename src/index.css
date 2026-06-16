@@ -50,6 +50,17 @@
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f8fafc;
+  --color-border-primary: #2563eb;
+  --color-border-secondary: #e2e8f0;
+  --color-border-tertiary: #e2e8f0;
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
 }
 
 /* ================== RESET & BASE ================== */
