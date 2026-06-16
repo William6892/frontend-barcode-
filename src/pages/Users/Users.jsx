@@ -202,7 +202,7 @@ const Users = () => {
       setLoading(true);
       setError(null);
       const res = await api.get('/users');
-      console.log('📦 Usuarios recibidos:', res.data); // 👈 Debug
+      console.log('📦 Usuarios recibidos:', res.data);
       if (res.success) setUsers(res.data);
       else setError('Error al cargar usuarios');
     } catch (err) {
@@ -217,8 +217,8 @@ const Users = () => {
     return u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
   });
 
-  // ✅ CORREGIDO: IsActive con I mayúscula
-  const activeCount   = users.filter((u) => u.IsActive).length;
+  // ✅ CORREGIDO: isActive en minúscula
+  const activeCount   = users.filter((u) => u.isActive).length;
   const inactiveCount = users.length - activeCount;
   const adminCount    = users.filter((u) => u.role === 'Admin').length;
 
@@ -241,7 +241,7 @@ const Users = () => {
     }
   };
 
-  // ✅ CORREGIDO: IsActive con I mayúscula
+  // ✅ CORREGIDO: isActive en minúscula
   const handleToggle = async (id, isActive, username) => {
     const action = isActive ? 'desactivar' : 'activar';
     if (!window.confirm(`¿Deseas ${action} a "${username}"?`)) return;
@@ -250,7 +250,7 @@ const Users = () => {
       const res = await api.post(endpoint);
       if (res.success)
         setUsers((prev) =>
-          prev.map((u) => (u.id === id ? { ...u, IsActive: !isActive } : u))
+          prev.map((u) => (u.id === id ? { ...u, isActive: !isActive } : u))
         );
     } catch (err) {
       alert(err.message || `Error al ${action}`);
@@ -369,10 +369,10 @@ const Users = () => {
                       </span>
                     </td>
                     <td>
-                      {/* ✅ CORREGIDO: IsActive con I mayúscula */}
-                      <span className={`sp ${user.IsActive ? 'sp--active' : 'sp--inactive'}`}>
+                      {/* ✅ CORREGIDO: isActive en minúscula */}
+                      <span className={`sp ${user.isActive ? 'sp--active' : 'sp--inactive'}`}>
                         <span className="sp__dot" />
-                        {user.IsActive ? 'Activo' : 'Inactivo'}
+                        {user.isActive ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
                     {isAdmin && (
@@ -387,12 +387,12 @@ const Users = () => {
                             <Edit size={13} />
                           </button>
                           <button
-                            onClick={() => handleToggle(user.id, user.IsActive, user.username)}
+                            onClick={() => handleToggle(user.id, user.isActive, user.username)}
                             className="ab ab--toggle"
-                            title={user.IsActive ? 'Desactivar' : 'Activar'}
-                            aria-label={`${user.IsActive ? 'Desactivar' : 'Activar'} ${user.username}`}
+                            title={user.isActive ? 'Desactivar' : 'Activar'}
+                            aria-label={`${user.isActive ? 'Desactivar' : 'Activar'} ${user.username}`}
                           >
-                            {user.IsActive ? <UserX size={13} /> : <UserCheck size={13} />}
+                            {user.isActive ? <UserX size={13} /> : <UserCheck size={13} />}
                           </button>
                           <button
                             onClick={() => handleDelete(user.id, user.username)}
