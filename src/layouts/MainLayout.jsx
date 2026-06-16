@@ -1,18 +1,37 @@
-// layouts/MainLayout.jsx
-import React, { useState } from 'react';
+// layouts/MainLayout.jsx - VERSIÓN SIMPLE
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   LayoutDashboard, Truck, ScanLine, FileSearch, LogOut, User,
-  Bell, Menu, X, ChevronDown, Package, ArrowRightCircle
+  Menu, X, ChevronDown, Package, ArrowRightCircle
 } from 'lucide-react';
 import samsungLogo from '../assets/samsung-logo.png';
+import { api } from '../services/api';
 import './MainLayout.css';
 
 const MainLayout = () => {
   const { logout, user } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [totalShipments, setTotalShipments] = useState(0);
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      const stats = await api.get('/shipments/stats');
+      if (stats.success) {
+        setTotalProducts(stats.totalProducts || 0);
+        setTotalShipments(stats.totalShipments || 0);
+      }
+    } catch (error) {
+      console.error('Error cargando estadísticas:', error);
+    }
+  };
 
   const getInitials = (name) => {
     if (!name) return 'A';
@@ -59,17 +78,19 @@ const MainLayout = () => {
         </div>
 
         <div className="top-bar-right">
-          {/* Indicador de inventario en vivo */}
-          <div className="inventory-indicator">
-            <span className="inventory-dot"></span>
-            <span className="inventory-text">12 productos</span>
+          {/* Contadores en vivo */}
+          <div className="stats-indicators">
+            <div className="stat-pill">
+              <Package size={14} />
+              <span>{totalProducts}</span>
+            </div>
+            <div className="stat-pill">
+              <Truck size={14} />
+              <span>{totalShipments}</span>
+            </div>
           </div>
 
-          <button className="icon-btn">
-            <Bell size={20} />
-            <span className="notification-dot">3</span>
-          </button>
-
+          {/* Usuario */}
           <div className="user-menu-container">
             <button 
               className="user-menu-btn"
@@ -97,10 +118,6 @@ const MainLayout = () => {
                   </div>
                 </div>
                 <div className="dropdown-divider" />
-                <button className="dropdown-item">
-                  <User size={16} />
-                  <span>Mi Perfil</span>
-                </button>
                 <button onClick={logout} className="dropdown-item logout">
                   <LogOut size={16} />
                   <span>Cerrar Sesión</span>
@@ -113,7 +130,6 @@ const MainLayout = () => {
 
       {/* CONTENIDO PRINCIPAL */}
       <div className="main-container">
-        {/* SIDEBAR */}
         <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
           <nav className="nav-menu">
             {navItems.map((item) => (
@@ -135,8 +151,7 @@ const MainLayout = () => {
           </div>
         </aside>
 
-        {/* CONTENIDO */}
-        <main className={`main-content ${sidebarOpen ? 'with-sidebar' : 'full-width'}`}>
+        <main className="main-content">
           <Outlet />
         </main>
       </div>
