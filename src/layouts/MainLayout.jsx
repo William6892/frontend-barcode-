@@ -132,12 +132,6 @@ const MainLayout = () => {
               </NavLink>
             ))}
           </nav>
-          <div className="sidebar-footer">
-            <button onClick={logout} className="logout-btn">
-              <LogOut size={20} />
-              <span>Cerrar Sesión</span>
-            </button>
-          </div>
         </aside>
 
         <main className="main-content">
