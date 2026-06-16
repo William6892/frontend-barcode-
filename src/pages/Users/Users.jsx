@@ -202,6 +202,7 @@ const Users = () => {
       setLoading(true);
       setError(null);
       const res = await api.get('/users');
+      console.log('📦 Usuarios recibidos:', res.data); // 👈 Debug
       if (res.success) setUsers(res.data);
       else setError('Error al cargar usuarios');
     } catch (err) {
@@ -216,6 +217,7 @@ const Users = () => {
     return u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
   });
 
+  // ✅ CORREGIDO: IsActive con I mayúscula
   const activeCount   = users.filter((u) => u.IsActive).length;
   const inactiveCount = users.length - activeCount;
   const adminCount    = users.filter((u) => u.role === 'Admin').length;
@@ -239,6 +241,7 @@ const Users = () => {
     }
   };
 
+  // ✅ CORREGIDO: IsActive con I mayúscula
   const handleToggle = async (id, isActive, username) => {
     const action = isActive ? 'desactivar' : 'activar';
     if (!window.confirm(`¿Deseas ${action} a "${username}"?`)) return;
@@ -366,6 +369,7 @@ const Users = () => {
                       </span>
                     </td>
                     <td>
+                      {/* ✅ CORREGIDO: IsActive con I mayúscula */}
                       <span className={`sp ${user.IsActive ? 'sp--active' : 'sp--inactive'}`}>
                         <span className="sp__dot" />
                         {user.IsActive ? 'Activo' : 'Inactivo'}
