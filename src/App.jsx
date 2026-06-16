@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'; 
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -41,10 +41,10 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter> 
         <AppRoutes />
         <Toaster theme="dark" position="top-right" richColors />
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   );
 }
