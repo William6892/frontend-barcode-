@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LayoutDashboard, Truck, ScanLine, FileSearch, LogOut } from 'lucide-react';
+import { LayoutDashboard, Truck, ScanLine, FileSearch, LogOut, User } from 'lucide-react'; // ✅ Agregar User
 import './MainLayout.css';
 
 const MainLayout = () => {
@@ -12,11 +12,11 @@ const MainLayout = () => {
     { to: '/shipments/new', icon: <Truck size={20} />, label: 'Envíos' },
     { to: '/scanner', icon: <ScanLine size={20} />, label: 'Escáner' },
     { to: '/audit', icon: <FileSearch size={20} />, label: 'Auditoría' },
+    { to: '/users', icon: <User size={20} />, label: 'Usuarios' }, // ✅ Ahora User está importado
   ];
 
   return (
     <div className="main-layout">
-      {/* Sidebar (Glassmorphism) */}
       <aside className="sidebar glass-panel">
         <div>
           <div className="sidebar-header">
@@ -51,7 +51,6 @@ const MainLayout = () => {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="main-content animate-fade-in">
         <Outlet />
       </main>

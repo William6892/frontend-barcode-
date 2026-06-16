@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import ShipmentCreation from './pages/Shipment/ShipmentCreation';
 import Scanner from './pages/Scanner/Scanner';
 import Audit from './pages/Audit/Audit';
+import Users from "./pages/Users/Users";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
@@ -31,6 +32,7 @@ function AppRoutes() {
         <Route path="/shipments/new" element={<ShipmentCreation />} />
         <Route path="/scanner" element={<Scanner />} />
         <Route path="/audit" element={<Audit />} />
+        <Route path="/users" element={<Users />} /> 
       </Route>
     </Routes>
   );

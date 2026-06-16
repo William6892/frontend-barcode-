@@ -1,3 +1,4 @@
+// api/api.js
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7131/api';
 
 const getHeaders = () => {
@@ -15,9 +16,22 @@ export const api = {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },
+  
   post: async (endpoint, data) => {
     const res = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(text);
+    return text ? JSON.parse(text) : {};
+  },
+
+  // ✅ SOLO AGREGAR ESTO - PUT para actualizar
+  put: async (endpoint, data) => {
+    const res = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(data)
     });
