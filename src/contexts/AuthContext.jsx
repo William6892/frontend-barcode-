@@ -82,7 +82,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
   };
 
-  const isAdmin = user?.role?.toLowerCase() === 'admin';
+  // ✅ CORREGIDO: Compara exactamente con 'Admin'
+  const isAdmin = user?.role === 'Admin';
 
   return (
     <AuthContext.Provider value={{
