@@ -101,7 +101,6 @@ const Audit = () => {
     try {
       setLoadingDetail(true);
       const data = await api.get(`/Shipment/${shipment.id}`, { headers: headers() });
-      console.log('📦 Detalle del envío:', data);
       setSelectedShipment(data);
     } catch (err) {
       toast.error('Error al cargar detalle: ' + err.message);
@@ -142,7 +141,7 @@ const Audit = () => {
             <StatusBadge status={selectedShipment.status} />
           </div>
 
-          {/* Info grid - CORREGIDO con los campos correctos */}
+          {/* Info grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
             <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', padding: '0.875rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '4px' }}>
@@ -189,7 +188,6 @@ const Audit = () => {
               </div>
             </div>
 
-            {/* 🔥 MOSTRAR ESTADO DEL ENVÍO EN VEZ DE "Completado por" */}
             <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', padding: '0.875rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '4px' }}>
                 <Clock size={15} /> Estado
