@@ -80,7 +80,6 @@ const Scanner = () => {
         name: p.name,
         model: p.model,
         scannedCount: p.scannedCount || 0,
-        expectedUnits: p.expectedUnits || 0,
         barcodes: p.barcodes || []
       }));
 
@@ -159,10 +158,10 @@ const Scanner = () => {
     }
   }, [showShipmentSelector, selectedShipment, selectedProductId]);
 
+  // ✅ CORREGIDO: totalExpected es la cantidad de productos, no unidades esperadas
   const totalScanned = scannedItems.length;
-  const totalExpected = expectedProducts.reduce((sum, p) => sum + (p.expectedUnits || 0), 0);
+  const totalExpected = expectedProducts.length;
   const progressPercent = totalExpected > 0 ? (totalScanned / totalExpected) * 100 : 0;
-  const isComplete = totalExpected > 0 && totalScanned >= totalExpected;
 
   // ─── SELECTOR DE ENVÍO ────────────────────────────────────────────────────
   if (showShipmentSelector) {
@@ -326,18 +325,6 @@ const Scanner = () => {
                 {selectedShipment?.shipmentNumber}
               </div>
             </div>
-            {isComplete && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                background: 'var(--color-success-bg)',
-                color: 'var(--color-success)',
-                padding: '0.4rem 0.875rem',
-                borderRadius: 'var(--radius-full)',
-                fontSize: '0.875rem'
-              }}>
-                <CheckCircle2 size={15} /> Completo
-              </div>
-            )}
           </div>
 
           <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
@@ -348,12 +335,12 @@ const Scanner = () => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
             <span>Progreso del envío</span>
-            <span style={{ fontWeight: 600 }}>{totalScanned} / {totalExpected || '—'} unidades</span>
+            <span style={{ fontWeight: 600 }}>{totalScanned} productos escaneados</span>
           </div>
           <div style={{ background: 'var(--bg-app)', borderRadius: 'var(--radius-full)', height: '8px', overflow: 'hidden' }}>
             <div style={{
               width: `${progressPercent}%`,
-              background: isComplete ? 'var(--color-success)' : 'var(--color-primary)',
+              background: 'var(--color-primary)',
               height: '100%',
               borderRadius: 'var(--radius-full)',
               transition: 'width 0.3s'
@@ -369,21 +356,18 @@ const Scanner = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {expectedProducts.map(product => {
               const isSelected = selectedProductId == product.id;
-              const isDone = product.expectedUnits > 0 && product.scannedCount >= product.expectedUnits;
               return (
                 <button
                   key={product.id}
                   type="button"
                   onClick={() => setSelectedProductId(product.id)}
-                  disabled={isDone}
                   style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '0.875rem 1rem',
                     background: isSelected ? 'var(--color-primary-bg)' : 'var(--bg-surface)',
                     border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--border-glass)',
                     borderRadius: 'var(--radius-lg)',
-                    cursor: isDone ? 'default' : 'pointer',
-                    opacity: isDone ? 0.5 : 1,
+                    cursor: 'pointer',
                     transition: 'all 0.15s'
                   }}
                 >
@@ -392,12 +376,9 @@ const Scanner = () => {
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>{product.model}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: isDone ? 'var(--color-success)' : 'var(--color-primary)' }}>
-                      {product.scannedCount}{product.expectedUnits > 0 && ` / ${product.expectedUnits}`}
+                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--color-primary)' }}>
+                      {product.scannedCount}
                     </div>
-                    {isDone && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--color-success)', marginTop: '2px' }}>Completado</div>
-                    )}
                   </div>
                 </button>
               );
@@ -518,8 +499,8 @@ const Scanner = () => {
           )}
         </div>
 
-        {/* Finalizar */}
-        {!isComplete && totalExpected > 0 && totalScanned > 0 && (
+        {/* ✅ CORREGIDO: Botón finalizar aparece con 1 escaneo */}
+        {totalScanned > 0 && (
           <button
             className="btn btn-primary w-full"
             style={{
@@ -534,14 +515,14 @@ const Scanner = () => {
                 await api.post(`/Shipment/${selectedShipment.id}/complete`, {}, {
                   headers: { Authorization: `Bearer ${token}` }
                 });
-                toast.success('Envío completado exitosamente');
+                toast.success(`✅ Envío finalizado con ${totalScanned} productos escaneados`);
                 setShowShipmentSelector(true);
               } catch {
-                toast.error('Error al completar el envío');
+                toast.error('❌ Error al finalizar el envío');
               }
             }}
           >
-            <CircleCheck size={18} /> Finalizar envío
+            <CircleCheck size={18} /> Finalizar envío ({totalScanned} productos)
           </button>
         )}
       </div>
