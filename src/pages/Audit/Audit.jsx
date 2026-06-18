@@ -47,7 +47,6 @@ const Audit = () => {
       setLoading(true);
       const url = status ? `/Shipment?status=${status}` : '/Shipment';
       const data = await api.get(url, { headers: headers() });
-      console.log('📦 LISTA DE ENVÍOS (loadAll):', data);
       setShipments(data);
     } catch (err) {
       toast.error('Error al cargar envíos: ' + err.message);
@@ -101,30 +100,10 @@ const Audit = () => {
   const openDetail = async (shipment) => {
     try {
       setLoadingDetail(true);
-      console.log('🔍 ABRIENDO DETALLE DEL ENVÍO:', shipment);
-      console.log('🔍 ID del envío:', shipment.id);
-      
       const data = await api.get(`/Shipment/${shipment.id}`, { headers: headers() });
-      
-      // 🔥 🔥 🔥 LOGS DE DEPURACIÓN - MUESTRAN TODOS LOS DATOS 🔥 🔥 🔥
-      console.log('📦 📦 📦 DATOS COMPLETOS DEL BACKEND 📦 📦 📦');
-      console.log(JSON.stringify(data, null, 2));
-      console.log('📦 NOMBRES DE CAMPOS DEL OBJETO PRINCIPAL:', Object.keys(data));
-      console.log('📦 DATOS DEL CONDUCTOR:', data.driverName);
-      console.log('📦 PLACA:', data.vehiclePlate);
-      console.log('📦 FECHA CREACIÓN:', data.createdAt);
-      console.log('📦 CREADO POR:', data.createdByUserName);
-      console.log('📦 COMPLETADO POR:', data.completedByUserName);
-      console.log('📦 PRODUCTOS:', data.products);
-      
-      if (data.products && data.products.length > 0) {
-        console.log('📦 PRIMER PRODUCTO:', data.products[0]);
-        console.log('📦 NOMBRES DE CAMPOS DEL PRODUCTO:', Object.keys(data.products[0]));
-      }
-      
+      console.log('📦 Detalle del envío:', data);
       setSelectedShipment(data);
     } catch (err) {
-      console.error('❌ ERROR AL CARGAR DETALLE:', err);
       toast.error('Error al cargar detalle: ' + err.message);
     } finally {
       setLoadingDetail(false);
@@ -149,26 +128,6 @@ const Audit = () => {
           <ChevronLeft size={16} /> Volver a auditoría
         </button>
 
-        {/* 🔥 DEBUG: MUESTRA TODOS LOS DATOS EN PANTALLA 🔥 */}
-        <div className="glass-panel" style={{ padding: '1rem', marginBottom: '1rem', background: 'var(--color-warning-bg)', border: '2px solid var(--color-warning)' }}>
-          <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={16} /> DATOS CRUDOS DEL BACKEND (DEBUG)
-          </h4>
-          <pre style={{ 
-            background: 'var(--bg-app)', 
-            padding: '0.75rem', 
-            borderRadius: 'var(--radius-md)',
-            fontSize: '0.65rem',
-            overflow: 'auto',
-            maxHeight: '250px',
-            color: 'var(--text-primary)',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-all'
-          }}>
-            {JSON.stringify(selectedShipment, null, 2)}
-          </pre>
-        </div>
-
         {/* Header del envío */}
         <div className="glass-panel" style={{ padding: '1.75rem', marginBottom: '1.5rem', background: 'linear-gradient(135deg, var(--color-primary-bg), var(--bg-surface))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -183,7 +142,7 @@ const Audit = () => {
             <StatusBadge status={selectedShipment.status} />
           </div>
 
-          {/* Info grid - con múltiples fallbacks para encontrar los campos */}
+          {/* Info grid - CORREGIDO con los campos correctos */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
             <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', padding: '0.875rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '4px' }}>
@@ -199,7 +158,7 @@ const Audit = () => {
                 <CreditCard size={15} /> Placa
               </div>
               <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                {selectedShipment.vehiclePlate || selectedShipment.VehiclePlate || '—'}
+                {selectedShipment.vehiclePlate || '—'}
               </div>
             </div>
 
@@ -217,9 +176,7 @@ const Audit = () => {
                 <Calendar size={15} /> Fecha creación
               </div>
               <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                {selectedShipment.createdAt || selectedShipment.CreatedAt ? 
-                  new Date(selectedShipment.createdAt || selectedShipment.CreatedAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) 
-                  : '—'}
+                {selectedShipment.createdAt ? new Date(selectedShipment.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
               </div>
             </div>
 
@@ -228,16 +185,17 @@ const Audit = () => {
                 <Hash size={15} /> Creado por
               </div>
               <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                {selectedShipment.createdByUserName || selectedShipment.CreatedByUserName || '—'}
+                {selectedShipment.createdByUserName || '—'}
               </div>
             </div>
 
+            {/* 🔥 MOSTRAR ESTADO DEL ENVÍO EN VEZ DE "Completado por" */}
             <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', padding: '0.875rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '4px' }}>
-                <Clock size={15} /> Completado por
+                <Clock size={15} /> Estado
               </div>
               <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                {selectedShipment.completedByUserName || selectedShipment.CompletedByUserName || '—'}
+                {selectedShipment.status === 'Completed' ? '✅ Completado' : '🔄 Activo'}
               </div>
             </div>
           </div>
