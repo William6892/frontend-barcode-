@@ -24,6 +24,7 @@ const Scanner = () => {
   const [recentScans, setRecentScans] = useState([]);
   const inputRef = useRef(null);
 
+  // ─── Cargar envíos activos ────────────────────────────────────────────────
   useEffect(() => {
     loadShipments();
   }, []);
@@ -44,6 +45,7 @@ const Scanner = () => {
     }
   };
 
+  // ─── Filtro de búsqueda ──────────────────────────────────────────────────
   useEffect(() => {
     let filtered = [...shipments];
     if (searchTerm) {
@@ -65,6 +67,7 @@ const Scanner = () => {
     setFilteredShipments(filtered);
   }, [searchTerm, shipments, searchType]);
 
+  // ─── Cargar detalles del envío ──────────────────────────────────────────
   const loadShipmentDetails = async (shipment) => {
     try {
       setLoading(true);
@@ -84,16 +87,6 @@ const Scanner = () => {
       }));
 
       setExpectedProducts(products);
-
-      const previousScans = products.flatMap(p =>
-        (p.barcodes || []).map(bc => ({
-          id: `${p.id}-${bc}`,
-          barcode: bc,
-          productName: p.name,
-          scannedAt: new Date().toLocaleTimeString()
-        }))
-      );
-      setScannedItems(previousScans.reverse());
       setSelectedProductId('');
       setShowShipmentSelector(false);
 
@@ -105,6 +98,24 @@ const Scanner = () => {
     }
   };
 
+  // ─── 🔥 NUEVO: Reconstruir historial cuando cambian los productos ───────
+  useEffect(() => {
+    if (expectedProducts.length === 0) return;
+
+    const allScans = expectedProducts.flatMap(p =>
+      (p.barcodes || []).map(bc => ({
+        id: `${p.id}-${bc}`,
+        barcode: bc,
+        productName: p.name,
+        scannedAt: new Date().toLocaleTimeString()
+      }))
+    );
+
+    setScannedItems(allScans.reverse());
+    setRecentScans(allScans.slice(0, 5));
+  }, [expectedProducts]);
+
+  // ─── Escanear producto ────────────────────────────────────────────────────
   const handleScan = async (e) => {
     e.preventDefault();
     if (!barcode.trim()) return toast.error('Ingresa un código de barras');
@@ -150,6 +161,7 @@ const Scanner = () => {
     }
   };
 
+  // ─── Auto-focus ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!showShipmentSelector && selectedShipment && selectedProductId) {
       inputRef.current?.focus();
@@ -158,7 +170,7 @@ const Scanner = () => {
     }
   }, [showShipmentSelector, selectedShipment, selectedProductId]);
 
-  // ✅ CORREGIDO: totalExpected es la cantidad de productos, no unidades esperadas
+  // ─── Cálculos ─────────────────────────────────────────────────────────────
   const totalScanned = scannedItems.length;
   const totalExpected = expectedProducts.length;
   const progressPercent = totalExpected > 0 ? (totalScanned / totalExpected) * 100 : 0;
@@ -169,7 +181,6 @@ const Scanner = () => {
       <div className="scanner-container" style={{ minHeight: '100vh', background: 'var(--bg-gradient)', padding: '2rem' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
 
-          {/* Header */}
           <div style={{ marginBottom: '2rem' }}>
             <h1 style={{ fontSize: '2rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
               Escáner de despacho
@@ -179,7 +190,6 @@ const Scanner = () => {
             </p>
           </div>
 
-          {/* Search */}
           <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <div style={{ flex: 2, position: 'relative' }}>
@@ -228,7 +238,6 @@ const Scanner = () => {
             </div>
           </div>
 
-          {/* Lista */}
           {loadingShipments ? (
             <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
               <div className="spinner" style={{ width: '36px', height: '36px', margin: '0 auto 1rem' }} />
@@ -305,7 +314,6 @@ const Scanner = () => {
     <div className="scanner-container" style={{ minHeight: '100vh', background: 'var(--bg-gradient)', padding: '2rem' }}>
       <div style={{ maxWidth: '760px', margin: '0 auto' }}>
 
-        {/* Botón volver */}
         <button
           onClick={() => setShowShipmentSelector(true)}
           className="btn btn-glass"
@@ -314,7 +322,6 @@ const Scanner = () => {
           <ChevronLeft size={16} /> Cambiar envío
         </button>
 
-        {/* Banner del envío */}
         <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', background: 'linear-gradient(135deg, var(--color-primary-bg), var(--bg-surface))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
             <div>
@@ -348,7 +355,6 @@ const Scanner = () => {
           </div>
         </div>
 
-        {/* Selector de producto */}
         <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
           <div style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.875rem' }}>
             Producto a escanear
@@ -386,7 +392,6 @@ const Scanner = () => {
           </div>
         </div>
 
-        {/* Input de escaneo */}
         <form onSubmit={handleScan}>
           <div className="glass-panel" style={{ padding: '2rem 1.5rem', textAlign: 'center', marginBottom: '1rem' }}>
             <div style={{
@@ -437,7 +442,6 @@ const Scanner = () => {
           </div>
         </form>
 
-        {/* Pills recientes */}
         {recentScans.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
             {recentScans.map((scan, i) => (
@@ -455,7 +459,6 @@ const Scanner = () => {
           </div>
         )}
 
-        {/* Historial */}
         <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
@@ -499,7 +502,7 @@ const Scanner = () => {
           )}
         </div>
 
-        {/* ✅ CORREGIDO: Botón finalizar aparece con 1 escaneo */}
+        {/* ✅ Botón finalizar - aparece con cualquier escaneo */}
         {totalScanned > 0 && (
           <button
             className="btn btn-primary w-full"
