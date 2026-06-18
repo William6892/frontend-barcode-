@@ -80,25 +80,26 @@ const Scanner = () => {
 
       setSelectedShipment(response);
 
+      // 🔥 CORREGIDO: usa scannedItems en lugar de barcodes
       const products = response.products.map(p => ({
         id: p.expectedProductId,
         name: p.name,
         model: p.model,
         scannedCount: p.scannedCount || 0,
-        barcodes: p.barcodes || []
+        scannedItems: p.scannedItems || []  // ← Guardamos scannedItems completo
       }));
 
-      console.log('📦 Productos con barcodes:', products);
+      console.log('📦 Productos con scannedItems:', products);
 
       setExpectedProducts(products);
 
-      // 🔥 RECONSTRUIR HISTORIAL AQUÍ MISMO
+      // Reconstruir historial desde scannedItems
       const allScans = products.flatMap(p =>
-        (p.barcodes || []).map(bc => ({
-          id: `${p.id}-${bc}`,
-          barcode: bc,
+        (p.scannedItems || []).map(si => ({
+          id: `${p.id}-${si.barcode}`,
+          barcode: si.barcode,
           productName: p.name,
-          scannedAt: new Date().toLocaleTimeString()
+          scannedAt: new Date(si.scannedAt).toLocaleTimeString()
         }))
       );
 
@@ -149,7 +150,11 @@ const Scanner = () => {
         setRecentScans(prev => [newItem, ...prev].slice(0, 5));
         setExpectedProducts(prev => prev.map(p =>
           p.id == selectedProductId
-            ? { ...p, scannedCount: (p.scannedCount || 0) + 1, barcodes: [...(p.barcodes || []), barcode.trim()] }
+            ? { 
+                ...p, 
+                scannedCount: (p.scannedCount || 0) + 1,
+                scannedItems: [...(p.scannedItems || []), { barcode: barcode.trim(), scannedAt: new Date().toISOString() }]
+              }
             : p
         ));
 
