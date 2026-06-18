@@ -15,6 +15,7 @@ export const AuthProvider = ({ children }) => {
       return null;
     }
   });
+  const [loading, setLoading] = useState(true);
 
   const getUserFromToken = (token) => {
     try {
@@ -30,6 +31,53 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // 🔥 VALIDAR TOKEN CONTRA EL BACKEND
+  useEffect(() => {
+    const validateToken = async () => {
+      const storedToken = localStorage.getItem('token');
+      
+      if (!storedToken) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'https://localhost:7131/api';
+        const res = await fetch(`${API_URL}/Auth/validate`, {
+          headers: {
+            'Authorization': `Bearer ${storedToken}`
+          }
+        });
+
+        if (res.ok) {
+          // Token válido
+          const userData = getUserFromToken(storedToken);
+          setToken(storedToken);
+          setUser(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+        } else {
+          // Token inválido o expirado
+          console.warn('Token inválido, limpiando sesión');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setToken(null);
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Error validando token:', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setToken(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    validateToken();
+  }, []);
+
+  // Efecto para sincronizar token con localStorage
   useEffect(() => {
     if (token) {
       localStorage.setItem('token', token);
@@ -82,8 +130,25 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
   };
 
-  // ✅ CORREGIDO: Compara exactamente con 'Admin'
   const isAdmin = user?.role === 'Admin';
+
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        background: 'var(--bg-app)',
+        color: 'var(--text-primary)'
+      }}>
+        <div>
+          <div className="spinner" style={{ width: '40px', height: '40px', margin: '0 auto 1rem' }}></div>
+          <p>Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={{
@@ -92,7 +157,8 @@ export const AuthProvider = ({ children }) => {
       login,
       logout,
       isAuthenticated: !!token,
-      isAdmin
+      isAdmin,
+      loading
     }}>
       {children}
     </AuthContext.Provider>
