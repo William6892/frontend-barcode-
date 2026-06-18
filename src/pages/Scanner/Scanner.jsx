@@ -76,6 +76,8 @@ const Scanner = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      console.log('📦 Datos del envío:', response);
+
       setSelectedShipment(response);
 
       const products = response.products.map(p => ({
@@ -86,7 +88,25 @@ const Scanner = () => {
         barcodes: p.barcodes || []
       }));
 
+      console.log('📦 Productos con barcodes:', products);
+
       setExpectedProducts(products);
+
+      // 🔥 RECONSTRUIR HISTORIAL AQUÍ MISMO
+      const allScans = products.flatMap(p =>
+        (p.barcodes || []).map(bc => ({
+          id: `${p.id}-${bc}`,
+          barcode: bc,
+          productName: p.name,
+          scannedAt: new Date().toLocaleTimeString()
+        }))
+      );
+
+      console.log('📦 Escaneos reconstruidos:', allScans);
+
+      setScannedItems(allScans.reverse());
+      setRecentScans(allScans.slice(0, 5));
+
       setSelectedProductId('');
       setShowShipmentSelector(false);
 
@@ -97,23 +117,6 @@ const Scanner = () => {
       setLoading(false);
     }
   };
-
-  // ─── 🔥 NUEVO: Reconstruir historial cuando cambian los productos ───────
-  useEffect(() => {
-    if (expectedProducts.length === 0) return;
-
-    const allScans = expectedProducts.flatMap(p =>
-      (p.barcodes || []).map(bc => ({
-        id: `${p.id}-${bc}`,
-        barcode: bc,
-        productName: p.name,
-        scannedAt: new Date().toLocaleTimeString()
-      }))
-    );
-
-    setScannedItems(allScans.reverse());
-    setRecentScans(allScans.slice(0, 5));
-  }, [expectedProducts]);
 
   // ─── Escanear producto ────────────────────────────────────────────────────
   const handleScan = async (e) => {
@@ -502,7 +505,6 @@ const Scanner = () => {
           )}
         </div>
 
-        {/* ✅ Botón finalizar - aparece con cualquier escaneo */}
         {totalScanned > 0 && (
           <button
             className="btn btn-primary w-full"
