@@ -36,7 +36,7 @@ const Audit = () => {
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState('shipmentNumber'); // shipmentNumber | vehiclePlate | barcode
+  const [searchType, setSearchType] = useState('shipmentNumber');
   const [statusFilter, setStatusFilter] = useState('');
   const [searching, setSearching] = useState(false);
 
@@ -68,12 +68,10 @@ const Audit = () => {
       let data;
 
       if (searchType === 'barcode') {
-        // Busca por serial → devuelve un objeto, no array
         const result = await api.get(
           `/Shipment/search?barcode=${encodeURIComponent(searchQuery.trim())}`,
           { headers: headers() }
         );
-        // Normalizar a array para reutilizar el mismo render
         data = result ? [result] : [];
       } else {
         const param = searchType === 'shipmentNumber'
@@ -104,6 +102,7 @@ const Audit = () => {
     try {
       setLoadingDetail(true);
       const data = await api.get(`/Shipment/${shipment.id}`, { headers: headers() });
+      console.log('📦 Detalle del envío:', data);
       setSelectedShipment(data);
     } catch (err) {
       toast.error('Error al cargar detalle: ' + err.message);
@@ -114,8 +113,10 @@ const Audit = () => {
 
   // ─── DETALLE ────────────────────────────────────────────────────────────
   if (selectedShipment) {
-    const totalExpected = selectedShipment.products?.reduce((s, p) => s + (p.expectedUnits || 0), 0) || 0;
-    const totalScanned  = selectedShipment.products?.reduce((s, p) => s + (p.scannedCount  || 0), 0) || 0;
+    // 🔥 Cálculo correcto: total productos esperados = cantidad de productos
+    const totalExpected = selectedShipment.products?.length || 0;
+    // 🔥 Total escaneados = suma de scannedCount de cada producto
+    const totalScanned = selectedShipment.products?.reduce((s, p) => s + (p.scannedCount || 0), 0) || 0;
     const pct = totalExpected > 0 ? Math.round((totalScanned / totalExpected) * 100) : 0;
 
     return (
@@ -186,8 +187,8 @@ const Audit = () => {
             </span>
           </div>
           {(selectedShipment.products || []).map((product, i) => {
-            const done = product.expectedUnits > 0 && product.scannedCount >= product.expectedUnits;
-            const prodPct = product.expectedUnits > 0 ? Math.round((product.scannedCount / product.expectedUnits) * 100) : 0;
+            // 🔥 Obtener barcodes desde scannedItems
+            const barcodes = (product.scannedItems || []).map(si => si.barcode);
             return (
               <div key={i} style={{ padding: '1.25rem 1.5rem', borderBottom: i < selectedShipment.products.length - 1 ? '1px solid var(--border-glass)' : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -196,35 +197,30 @@ const Audit = () => {
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{product.model}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ fontWeight: 700, fontSize: '1rem', color: done ? 'var(--color-success)' : 'var(--color-primary)' }}>
-                      {product.scannedCount} / {product.expectedUnits}
+                    <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-primary)' }}>
+                      {product.scannedCount || 0}
                     </span>
-                    {done && (
-                      <span style={{ fontSize: '0.75rem', background: 'var(--color-success-bg)', color: 'var(--color-success)', padding: '2px 10px', borderRadius: 'var(--radius-full)' }}>
-                        Completo
-                      </span>
-                    )}
                   </div>
                 </div>
 
-                {/* Barra de progreso del producto */}
-                <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-full)', height: '5px', overflow: 'hidden', marginBottom: product.barcodes?.length ? '0.875rem' : 0 }}>
-                  <div style={{ width: `${prodPct}%`, background: done ? 'var(--color-success)' : 'var(--color-primary)', height: '100%', borderRadius: 'var(--radius-full)' }} />
-                </div>
-
                 {/* Seriales escaneados */}
-                {product.barcodes?.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {product.barcodes.map((bc, j) => (
-                      <span key={j} style={{
-                        fontFamily: 'monospace', fontSize: '0.8rem',
-                        background: 'var(--bg-surface)', color: 'var(--text-secondary)',
-                        border: '1px solid var(--border-glass)',
-                        padding: '3px 10px', borderRadius: 'var(--radius-md)'
-                      }}>
-                        {bc}
-                      </span>
-                    ))}
+                {barcodes.length > 0 && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                      Seriales escaneados:
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {barcodes.map((bc, j) => (
+                        <span key={j} style={{
+                          fontFamily: 'monospace', fontSize: '0.8rem',
+                          background: 'var(--bg-surface)', color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-glass)',
+                          padding: '3px 10px', borderRadius: 'var(--radius-md)'
+                        }}>
+                          {bc}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -348,8 +344,9 @@ const Audit = () => {
             </thead>
             <tbody>
               {shipments.map((s, i) => {
-                const scanned  = s.products?.reduce((acc, p) => acc + (p.scannedCount  || 0), 0) ?? s.scannedCount  ?? 0;
-                const expected = s.products?.reduce((acc, p) => acc + (p.expectedUnits || 0), 0) ?? s.expectedUnits ?? 0;
+                // 🔥 Cálculo corregido
+                const scanned = s.products?.reduce((acc, p) => acc + (p.scannedCount || 0), 0) ?? 0;
+                const expected = s.products?.length ?? 0;
                 const pct = expected > 0 ? Math.round((scanned / expected) * 100) : 0;
 
                 return (
@@ -360,7 +357,6 @@ const Audit = () => {
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     onClick={() => openDetail(s)}
                   >
-                    {/* Envío */}
                     <td style={{ padding: '1rem 1.25rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
                         <div style={{ padding: '0.5rem', background: 'var(--bg-surface-hover)', borderRadius: 'var(--radius-md)', color: 'var(--color-primary)', flexShrink: 0 }}>
@@ -375,7 +371,6 @@ const Audit = () => {
                       </div>
                     </td>
 
-                    {/* Conductor */}
                     <td style={{ padding: '1rem 1.25rem' }}>
                       <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{s.driverName || '—'}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
@@ -383,14 +378,12 @@ const Audit = () => {
                       </div>
                     </td>
 
-                    {/* Transportadora */}
                     <td style={{ padding: '1rem 1.25rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <Truck size={13} /> {s.carrier || '—'}
                       </div>
                     </td>
 
-                    {/* Progreso */}
                     <td style={{ padding: '1rem 1.25rem', minWidth: '140px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '5px' }}>
                         <span>{scanned} / {expected} uds</span>
@@ -401,12 +394,10 @@ const Audit = () => {
                       </div>
                     </td>
 
-                    {/* Estado */}
                     <td style={{ padding: '1rem 1.25rem' }}>
                       <StatusBadge status={s.status} />
                     </td>
 
-                    {/* Acción */}
                     <td style={{ padding: '1rem 1.25rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
                         {loadingDetail
