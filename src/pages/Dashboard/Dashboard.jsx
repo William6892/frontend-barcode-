@@ -39,7 +39,7 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const StatCard = ({ icon, title, value, trend, color, glowColor }) => (
+  const StatCard = ({ icon, title, value, color, glowColor }) => (
     <div 
       className="glass-panel stat-card" 
       style={{ 
@@ -87,24 +87,6 @@ const Dashboard = () => {
           <h3 style={{ fontSize: '2.1rem', margin: 0, color: 'var(--text-primary)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1 }}>
             {value}
           </h3>
-          {trend && (
-            <span style={{ 
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '2px',
-              fontSize: '0.72rem', 
-              fontWeight: 700,
-              color: 'var(--color-success)',
-              background: 'var(--color-success-bg)',
-              border: '1px solid rgba(5, 150, 105, 0.2)',
-              padding: '0.2rem 0.5rem',
-              borderRadius: 'var(--radius-full)',
-              lineHeight: 1
-            }}>
-              <TrendingUp size={10} />
-              +{trend}%
-            </span>
-          )}
         </div>
       </div>
     </div>
@@ -156,7 +138,6 @@ const Dashboard = () => {
           icon={<CheckCircle size={24} />} 
           title="Completados" 
           value={stats.completedShipmentsCount} 
-          trend={8} 
           color="5, 150, 105" 
           glowColor="rgba(5, 150, 105, 0.25)" 
         />
@@ -164,7 +145,6 @@ const Dashboard = () => {
           icon={<Package size={24} />} 
           title="Total Hoy" 
           value={stats.totalShipmentsToday} 
-          trend={12} 
           color="217, 119, 6" 
           glowColor="rgba(217, 119, 6, 0.25)" 
         />
