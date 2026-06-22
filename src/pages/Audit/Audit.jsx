@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import {
   Search, Truck, User, Package, ChevronRight, ChevronLeft,
   RefreshCw, Box, Calendar, CreditCard, Hash, CheckCircle2,
-  Clock, AlertCircle, X, ScanBarcode, Filter
+  Clock, AlertCircle, X, ScanBarcode, Filter, Download
 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -38,8 +38,135 @@ const Audit = () => {
   const [searchType, setSearchType] = useState('shipmentNumber');
   const [statusFilter, setStatusFilter] = useState('');
   const [searching, setSearching] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
+
+  // ─── Descarga de Consolidado Diario ──────────────────────────────────────────
+  const handleDownloadConsolidation = async () => {
+    try {
+      setDownloading(true);
+      toast.loading('Generando consolidado...', { id: 'download-consolidated' });
+      
+      // 1. Obtener todos los envíos con estado 'Completed'
+      const completedShipments = await api.get('/Shipment?status=Completed', { headers: headers() });
+      
+      if (!completedShipments || completedShipments.length === 0) {
+        toast.dismiss('download-consolidated');
+        toast.info('No hay envíos completados para consolidar.');
+        return;
+      }
+      
+      // 2. Traer el detalle de cada envío completado para obtener los scannedItems (seriales)
+      const details = await Promise.all(
+        completedShipments.map(s => 
+          api.get(`/Shipment/${s.id}`, { headers: headers() }).catch(err => {
+            console.error(`Error al cargar detalle del envío ${s.shipmentNumber}:`, err);
+            return null;
+          })
+        )
+      );
+      
+      // 3. Generar las filas del CSV
+      const csvRows = [];
+      const csvHeaders = [
+        'Fecha Programada',
+        'N° Envío',
+        'Transportadora',
+        'Conductor',
+        'Cédula Conductor',
+        'Placa',
+        'Producto',
+        'Referencia/Modelo',
+        'Serial Escaneado',
+        'Hora de Lectura'
+      ];
+      
+      details.forEach(shipment => {
+        if (!shipment) return;
+        
+        const scheduledDateStr = shipment.scheduledDate 
+          ? new Date(shipment.scheduledDate).toLocaleDateString('es-CO') 
+          : (shipment.createdAt ? new Date(shipment.createdAt).toLocaleDateString('es-CO') : '—');
+          
+        const productsList = shipment.products || [];
+        
+        productsList.forEach(product => {
+          const scannedItemsList = product.scannedItems || [];
+          
+          if (scannedItemsList.length === 0) {
+            csvRows.push([
+              scheduledDateStr,
+              shipment.shipmentNumber || '—',
+              shipment.carrier || '—',
+              shipment.driverName || '—',
+              shipment.driverDocument || '—',
+              shipment.vehiclePlate || '—',
+              product.name || '—',
+              product.model || '—',
+              'SIN SERIAL',
+              '—'
+            ]);
+          } else {
+            scannedItemsList.forEach(item => {
+              const scannedTime = item.scannedAt 
+                ? new Date(item.scannedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                : '—';
+                
+              csvRows.push([
+                scheduledDateStr,
+                shipment.shipmentNumber || '—',
+                shipment.carrier || '—',
+                shipment.driverName || '—',
+                shipment.driverDocument || '—',
+                shipment.vehiclePlate || '—',
+                product.name || '—',
+                product.model || '—',
+                item.barcode || '—',
+                scannedTime
+              ]);
+            });
+          }
+        });
+      });
+      
+      if (csvRows.length === 0) {
+        toast.dismiss('download-consolidated');
+        toast.info('No hay productos escaneados en los envíos completados.');
+        return;
+      }
+      
+      // 4. Formatear y descargar CSV
+      const escapeCSVField = (val) => {
+        const str = (val === null || val === undefined) ? '' : String(val);
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+      
+      const csvContent = [
+        csvHeaders.join(';'),
+        ...csvRows.map(row => row.map(escapeCSVField).join(';'))
+      ].join('\r\n');
+      
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const formattedDate = new Date().toLocaleDateString('es-CO').replace(/\//g, '-');
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Consolidado_Salidas_${formattedDate}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('¡Consolidado descargado con éxito!', { id: 'download-consolidated' });
+    } catch (error) {
+      console.error('Error al generar el consolidado:', error);
+      toast.error('Error al generar el consolidado: ' + error.message, { id: 'download-consolidated' });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // ─── Carga de envíos ──────────────────────────────────────────────────────
   const loadAll = async (status = '') => {
@@ -349,9 +476,18 @@ const Audit = () => {
           </button>
         ))}
         <button
+          onClick={handleDownloadConsolidation}
+          className="btn btn-primary"
+          style={{ padding: '0.45rem 1.1rem', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', marginLeft: 'auto' }}
+          disabled={downloading}
+        >
+          <Download size={16} />
+          <span>{downloading ? 'Generando...' : 'Descargar Consolidado'}</span>
+        </button>
+        <button
           onClick={() => loadAll(statusFilter)}
           className="btn btn-glass"
-          style={{ padding: '0.45rem 0.875rem', marginLeft: 'auto' }}
+          style={{ padding: '0.45rem 0.875rem' }}
         >
           <RefreshCw size={15} />
         </button>
