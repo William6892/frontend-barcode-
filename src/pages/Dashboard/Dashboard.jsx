@@ -39,26 +39,91 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const StatCard = ({ icon, title, value, trend, colorClass }) => (
-    <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-      <div style={{ padding: '0.75rem', borderRadius: '50%', background: 'var(--bg-surface-hover)' }}>
+  const StatCard = ({ icon, title, value, trend, color, glowColor }) => (
+    <div 
+      className="glass-panel stat-card" 
+      style={{ 
+        padding: '1.5rem', 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '1.25rem',
+        '--glow-color': glowColor,
+        '--border-color-hover': `rgb(${color})`,
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Background soft glow decoration */}
+      <div style={{
+        position: 'absolute',
+        top: '-40%',
+        right: '-40%',
+        width: '140px',
+        height: '140px',
+        borderRadius: '50%',
+        background: `rgba(${color}, 0.12)`,
+        filter: 'blur(35px)',
+        pointerEvents: 'none'
+      }} />
+
+      <div style={{ 
+        padding: '0.85rem', 
+        borderRadius: 'var(--radius-lg)', 
+        background: `rgba(${color}, 0.08)`,
+        border: `1px solid rgba(${color}, 0.15)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: `0 8px 16px -4px rgba(${color}, 0.1)`,
+        color: `rgb(${color})`,
+        zIndex: 1
+      }}>
         {icon}
       </div>
-      <div style={{ flex: 1 }}>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{title}</p>
-        <h3 style={{ fontSize: '1.8rem', margin: 0, color: 'var(--text-primary)', fontWeight: 700 }}>{value}</h3>
-        {trend && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.1rem' }}>
-            <TrendingUp size={12} color="var(--color-success)" />
-            <span style={{ fontSize: '0.65rem', color: 'var(--color-success)' }}>{trend}% vs ayer</span>
-          </div>
-        )}
+      
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem', zIndex: 1 }}>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{title}</p>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <h3 style={{ fontSize: '2.1rem', margin: 0, color: 'var(--text-primary)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1 }}>
+            {value}
+          </h3>
+          {trend && (
+            <span style={{ 
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
+              fontSize: '0.72rem', 
+              fontWeight: 700,
+              color: 'var(--color-success)',
+              background: 'var(--color-success-bg)',
+              border: '1px solid rgba(5, 150, 105, 0.2)',
+              padding: '0.2rem 0.5rem',
+              borderRadius: 'var(--radius-full)',
+              lineHeight: 1
+            }}>
+              <TrendingUp size={10} />
+              +{trend}%
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
 
   return (
     <div className="animate-slide-up" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Styles for premium effects */}
+      <style>{`
+        .stat-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .stat-card:hover {
+          transform: translateY(-5px);
+          box-shadow: var(--shadow-lg), 0 12px 24px -10px var(--glow-color) !important;
+          border-color: var(--border-color-hover) !important;
+        }
+      `}</style>
+
       {/* HEADER CON ACCIONES RÁPIDAS */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
         <div>
@@ -79,11 +144,37 @@ const Dashboard = () => {
       </div>
 
       {/* STATS CARDS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <StatCard icon={<Truck size={24} color="var(--color-primary)" />} title="Envíos Activos" value={stats.activeShipmentsCount} />
-        <StatCard icon={<CheckCircle size={24} color="var(--color-success)" />} title="Completados" value={stats.completedShipmentsCount} trend={8} />
-        <StatCard icon={<Package size={24} color="var(--color-warning)" />} title="Total Hoy" value={stats.totalShipmentsToday} trend={12} />
-        <StatCard icon={<BarChart3 size={24} color="var(--color-primary)" />} title="Items Escaneados" value={stats.totalProductsScannedToday} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+        <StatCard 
+          icon={<Truck size={24} />} 
+          title="Envíos Activos" 
+          value={stats.activeShipmentsCount} 
+          color="37, 99, 235" 
+          glowColor="rgba(37, 99, 235, 0.25)" 
+        />
+        <StatCard 
+          icon={<CheckCircle size={24} />} 
+          title="Completados" 
+          value={stats.completedShipmentsCount} 
+          trend={8} 
+          color="5, 150, 105" 
+          glowColor="rgba(5, 150, 105, 0.25)" 
+        />
+        <StatCard 
+          icon={<Package size={24} />} 
+          title="Total Hoy" 
+          value={stats.totalShipmentsToday} 
+          trend={12} 
+          color="217, 119, 6" 
+          glowColor="rgba(217, 119, 6, 0.25)" 
+        />
+        <StatCard 
+          icon={<BarChart3 size={24} />} 
+          title="Items Escaneados" 
+          value={stats.totalProductsScannedToday} 
+          color="147, 51, 234" 
+          glowColor="rgba(147, 51, 234, 0.25)" 
+        />
       </div>
 
       {/* BAJO STOCK (si hay) */}
