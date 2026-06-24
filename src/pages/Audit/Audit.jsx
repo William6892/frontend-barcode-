@@ -39,6 +39,7 @@ const Audit = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [searching, setSearching] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [barcodeResults, setBarcodeResults] = useState(null);
 
   const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
 
@@ -187,29 +188,32 @@ const Audit = () => {
   // ─── Búsqueda ──────────────────────────────────────────────────────────────
   const handleSearch = async (e) => {
     e?.preventDefault();
-    if (!searchQuery.trim()) return loadAll(statusFilter);
+    if (!searchQuery.trim()) {
+      setBarcodeResults(null);
+      return loadAll(statusFilter);
+    }
 
     try {
       setSearching(true);
-      let data;
 
       if (searchType === 'barcode') {
-        const result = await api.get(
-          `/Shipment/search?barcode=${encodeURIComponent(searchQuery.trim())}`,
+        const results = await api.get(
+          `/Shipment/search-barcodes?query=${encodeURIComponent(searchQuery.trim())}`,
           { headers: headers() }
         );
-        data = result ? [result] : [];
+        setBarcodeResults(results || []);
       } else {
+        setBarcodeResults(null);
         const param = searchType === 'shipmentNumber'
           ? `shipmentNumber=${encodeURIComponent(searchQuery.trim())}`
           : `vehiclePlate=${encodeURIComponent(searchQuery.trim())}`;
-        data = await api.get(`/Shipment/search-shipments?${param}`, { headers: headers() });
+        const data = await api.get(`/Shipment/search-shipments?${param}`, { headers: headers() });
+        setShipments(data);
       }
-
-      setShipments(data);
     } catch (err) {
       if (err.message?.includes('404') || err.message?.toLowerCase().includes('no encontrado')) {
-        setShipments([]);
+        if (searchType === 'barcode') setBarcodeResults([]);
+        else setShipments([]);
       } else {
         toast.error('Error en la búsqueda: ' + err.message);
       }
@@ -220,6 +224,7 @@ const Audit = () => {
 
   const clearSearch = () => {
     setSearchQuery('');
+    setBarcodeResults(null);
     loadAll(statusFilter);
   };
 
@@ -493,6 +498,101 @@ const Audit = () => {
         </button>
       </div>
 
+      {/* Resultados de búsqueda por serial */}
+      {barcodeResults !== null ? (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+              <ScanBarcode size={18} style={{ color: 'var(--color-primary)' }} />
+              Resultados de seriales
+              <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)', background: 'var(--bg-surface)', padding: '2px 10px', borderRadius: 'var(--radius-full)' }}>
+                {barcodeResults.length} encontrado{barcodeResults.length !== 1 ? 's' : ''}
+              </span>
+            </h3>
+            <button onClick={clearSearch} className="btn btn-glass" style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <X size={14} /> Limpiar búsqueda
+            </button>
+          </div>
+
+          {searching ? (
+            <div className="glass-panel" style={{ padding: '4rem', textAlign: 'center' }}>
+              <div className="spinner" style={{ width: '36px', height: '36px', margin: '0 auto 1rem' }} />
+              <p style={{ color: 'var(--text-muted)' }}>Buscando seriales...</p>
+            </div>
+          ) : barcodeResults.length === 0 ? (
+            <div className="glass-panel" style={{ padding: '4rem', textAlign: 'center' }}>
+              <ScanBarcode size={44} style={{ opacity: 0.2, margin: '0 auto 1rem', display: 'block' }} />
+              <p style={{ fontSize: '1.1rem', marginBottom: '4px' }}>No se encontró el serial</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Intenta con otro número o verifica que haya sido escaneado</p>
+            </div>
+          ) : (
+            <div className="glass-panel" style={{ overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
+                <thead style={{ background: 'var(--bg-surface-active)' }}>
+                  <tr>
+                    {['Serial', 'Producto', 'Nº Envío', 'Transportadora', 'Conductor / Placa', 'Escaneado', 'Estado'].map((h, i) => (
+                      <th key={i} style={{ padding: '0.875rem 1rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {barcodeResults.map((r, i) => (
+                    <tr
+                      key={i}
+                      style={{ borderBottom: '1px solid var(--border-glass)', transition: 'background 0.15s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <span style={{
+                          fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 600,
+                          background: 'var(--color-primary-bg)', color: 'var(--color-primary)',
+                          padding: '4px 10px', borderRadius: 'var(--radius-md)'
+                        }}>
+                          {r.barcode}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{r.productName}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{r.productModel}</div>
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-primary)' }}>{r.shipmentNumber}</div>
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Truck size={13} /> {r.carrier || '—'}
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <div style={{ fontWeight: 500, fontSize: '0.88rem' }}>{r.driverName}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                          <CreditCard size={11} /> {r.vehiclePlate || '—'}
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <div style={{ fontSize: '0.88rem' }}>
+                          {r.scannedAt ? new Date(r.scannedAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {r.scannedAt ? new Date(r.scannedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : ''}
+                          {r.scannedByUserName ? ` · ${r.scannedByUserName}` : ''}
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <StatusBadge status={r.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
       {/* Tabla */}
       {loading ? (
         <div className="glass-panel" style={{ padding: '4rem', textAlign: 'center' }}>
@@ -586,6 +686,8 @@ const Audit = () => {
             </tbody>
           </table>
         </div>
+      )}
+        </>
       )}
     </div>
   );
