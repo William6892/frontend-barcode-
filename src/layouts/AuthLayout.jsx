@@ -106,22 +106,6 @@ const AuthLayout = () => {
           }}>
             Plataforma de gestión y trazabilidad de envíos con escaneo de códigos de barras en tiempo real.
           </p>
-
-          {/* Feature pills */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', justifyContent: 'center' }}>
-            {['Escaneo en tiempo real', 'Trazabilidad total', 'Reportes CSV', 'Auditoría completa'].map((feat, i) => (
-              <span key={i} style={{
-                padding: '0.45rem 1rem', borderRadius: '50px',
-                background: 'rgba(255,255,255,0.07)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: 'rgba(255,255,255,0.7)',
-                fontSize: '0.8rem', fontWeight: 500,
-                backdropFilter: 'blur(4px)',
-              }}>
-                {feat}
-              </span>
-            ))}
-          </div>
         </div>
 
         {/* Bottom badge */}
