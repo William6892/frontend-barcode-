@@ -187,7 +187,7 @@ const Scanner = () => {
   if (showShipmentSelector) {
     return (
       <div className="scanner-container" style={{ minHeight: '100vh', background: 'var(--bg-gradient)', padding: '2rem' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 
           <div style={{ marginBottom: '2rem' }}>
             <h1 style={{ fontSize: '2rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>

@@ -398,7 +398,7 @@ const Audit = () => {
 
   // ─── LISTA ───────────────────────────────────────────────────────────────
   return (
-    <div className="animate-slide-up" style={{ maxWidth: '1100px', margin: '0 auto', paddingBottom: '3rem' }}>
+    <div className="animate-slide-up" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '3rem' }}>
 
       <header style={{ marginBottom: '2rem' }}>
         <h1 className="text-primary" style={{ fontSize: '2.5rem', letterSpacing: '-0.04em', fontWeight: 700 }}>Auditoría</h1>
