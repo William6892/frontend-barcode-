@@ -6,27 +6,7 @@ import {
   Clock, AlertCircle, X, ScanBarcode, Filter, Download
 } from 'lucide-react';
 import { api } from '../../services/api';
-
-const STATUS_CONFIG = {
-  'Active':    { label: 'Activo',      bg: 'var(--color-primary-bg)',    color: 'var(--color-primary)' },
-  'Completed': { label: 'Completado',  bg: 'var(--color-success-bg)',    color: 'var(--color-success)' },
-  'Pending':   { label: 'Pendiente',   bg: 'var(--color-warning-bg)',    color: 'var(--color-warning)' },
-  'Cancelled': { label: 'Cancelado',   bg: 'var(--color-danger-bg)',     color: 'var(--color-danger)'  },
-};
-
-const StatusBadge = ({ status }) => {
-  const cfg = STATUS_CONFIG[status] || { label: status, bg: 'var(--bg-surface)', color: 'var(--text-muted)' };
-  return (
-    <span style={{
-      padding: '0.3rem 0.875rem',
-      borderRadius: 'var(--radius-full)',
-      fontSize: '0.8rem', fontWeight: 600,
-      background: cfg.bg, color: cfg.color
-    }}>
-      {cfg.label}
-    </span>
-  );
-};
+import StatusBadge from '../../components/StatusBadge';
 
 const Audit = () => {
   const [shipments, setShipments] = useState([]);
@@ -40,6 +20,12 @@ const Audit = () => {
   const [searching, setSearching] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [barcodeResults, setBarcodeResults] = useState(null);
+
+  // Estados de paginación
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [barcodePage, setBarcodePage] = useState(1);
+  const [barcodePageSize] = useState(50);
 
   const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
 
@@ -170,10 +156,12 @@ const Audit = () => {
   };
 
   // ─── Carga de envíos ──────────────────────────────────────────────────────
-  const loadAll = async (status = '') => {
+  const loadAll = async (status = '', currentPage = 1) => {
     try {
       setLoading(true);
-      const url = status ? `/Shipment?status=${status}` : '/Shipment';
+      const url = status 
+        ? `/Shipment?status=${status}&page=${currentPage}&pageSize=${pageSize}` 
+        : `/Shipment?page=${currentPage}&pageSize=${pageSize}`;
       const data = await api.get(url, { headers: headers() });
       setShipments(data);
     } catch (err) {
@@ -183,14 +171,18 @@ const Audit = () => {
     }
   };
 
-  useEffect(() => { loadAll(statusFilter); }, [statusFilter]);
+  useEffect(() => { 
+    setPage(1);
+    loadAll(statusFilter, 1); 
+  }, [statusFilter]);
 
   // ─── Búsqueda ──────────────────────────────────────────────────────────────
-  const handleSearch = async (e) => {
+  const handleSearch = async (e, currentBarcodePage = 1) => {
     e?.preventDefault();
     if (!searchQuery.trim()) {
       setBarcodeResults(null);
-      return loadAll(statusFilter);
+      setPage(1);
+      return loadAll(statusFilter, 1);
     }
 
     try {
@@ -198,7 +190,7 @@ const Audit = () => {
 
       if (searchType === 'barcode') {
         const results = await api.get(
-          `/Shipment/search-barcodes?query=${encodeURIComponent(searchQuery.trim())}`,
+          `/Shipment/search-barcodes?query=${encodeURIComponent(searchQuery.trim())}&page=${currentBarcodePage}&pageSize=${barcodePageSize}`,
           { headers: headers() }
         );
         setBarcodeResults(results || []);
@@ -225,7 +217,9 @@ const Audit = () => {
   const clearSearch = () => {
     setSearchQuery('');
     setBarcodeResults(null);
-    loadAll(statusFilter);
+    setPage(1);
+    setBarcodePage(1);
+    loadAll(statusFilter, 1);
   };
 
   // ─── Detalle de un envío ──────────────────────────────────────────────────
@@ -526,7 +520,8 @@ const Audit = () => {
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Intenta con otro número o verifica que haya sido escaneado</p>
             </div>
           ) : (
-            <div className="glass-panel" style={{ overflow: 'auto' }}>
+            <>
+              <div className="glass-panel" style={{ overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
                 <thead style={{ background: 'var(--bg-surface-active)' }}>
                   <tr>
@@ -589,6 +584,47 @@ const Audit = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* Controles de Paginación Seriales */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginTop: '1rem',
+              padding: '1rem 1.25rem',
+              background: 'var(--bg-surface)',
+              borderRadius: 'var(--radius-xl)',
+              border: '1px solid var(--border-glass)'
+            }}>
+              <button
+                onClick={() => {
+                  const prev = Math.max(barcodePage - 1, 1);
+                  setBarcodePage(prev);
+                  handleSearch(null, prev);
+                }}
+                disabled={barcodePage === 1}
+                className="btn btn-glass"
+                style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+              >
+                <ChevronLeft size={16} /> Anterior
+              </button>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                Página {barcodePage}
+              </span>
+              <button
+                onClick={() => {
+                  const next = barcodePage + 1;
+                  setBarcodePage(next);
+                  handleSearch(null, next);
+                }}
+                disabled={barcodeResults.length < barcodePageSize}
+                className="btn btn-glass"
+                style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+              >
+                Siguiente <ChevronRight size={16} />
+              </button>
+            </div>
+            </>
           )}
         </div>
       ) : (
@@ -685,6 +721,44 @@ const Audit = () => {
               })}
             </tbody>
           </table>
+
+          {/* Controles de Paginación Envíos */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            padding: '1rem 1.25rem',
+            background: 'var(--bg-surface-active)',
+            borderTop: '1px solid var(--border-glass)'
+          }}>
+            <button
+              onClick={() => {
+                const prev = Math.max(page - 1, 1);
+                setPage(prev);
+                loadAll(statusFilter, prev);
+              }}
+              disabled={page === 1}
+              className="btn btn-glass"
+              style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+            >
+              <ChevronLeft size={16} /> Anterior
+            </button>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+              Página {page}
+            </span>
+            <button
+              onClick={() => {
+                const next = page + 1;
+                setPage(next);
+                loadAll(statusFilter, next);
+              }}
+              disabled={shipments.length < pageSize}
+              className="btn btn-glass"
+              style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+            >
+              Siguiente <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       )}
         </>
