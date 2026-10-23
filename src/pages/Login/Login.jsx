@@ -88,14 +88,8 @@ const Login = () => {
           display: 'flex', alignItems: 'center', gap: '0.625rem',
           marginBottom: '0.75rem',
         }}>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '12px',
-            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
-          }}>
-            <ScanBarcode size={20} color="white" />
-          </div>
+          <img src="/favicon.svg" alt="" width={40} height={40}
+            style={{ borderRadius: '10px', boxShadow: '0 4px 12px rgba(11,20,55,0.25)' }} />
           <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             Control de Salidas
           </span>
