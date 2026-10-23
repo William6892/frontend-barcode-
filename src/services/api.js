@@ -17,65 +17,44 @@ const handleUnauthorized = () => {
   window.location.href = '/login';
 };
 
-export const api = {
-  get: async (endpoint) => {
-    const res = await fetch(`${BASE_URL}${endpoint}`, { headers: getHeaders() });
-    
-    if (res.status === 401) {
-      handleUnauthorized();
-      throw new Error('Sesión expirada');
-    }
-    
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-  },
-  
-  post: async (endpoint, data) => {
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(data)
-    });
-    
-    if (res.status === 401) {
-      handleUnauthorized();
-      throw new Error('Sesión expirada');
-    }
-    
-    const text = await res.text();
-    if (!res.ok) throw new Error(text);
-    return text ? JSON.parse(text) : {};
-  },
-  
-  put: async (endpoint, data) => {
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'PUT',
-      headers: getHeaders(),
-      body: JSON.stringify(data)
-    });
-    
-    if (res.status === 401) {
-      handleUnauthorized();
-      throw new Error('Sesión expirada');
-    }
-    
-    const text = await res.text();
-    if (!res.ok) throw new Error(text);
-    return text ? JSON.parse(text) : {};
-  },
-  
-  delete: async (endpoint) => {
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'DELETE',
-      headers: getHeaders()
-    });
-    
-    if (res.status === 401) {
-      handleUnauthorized();
-      throw new Error('Sesión expirada');
-    }
-    
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+// Convierte la respuesta de error del backend ({ error }, ProblemDetails o texto) en un mensaje legible
+export const parseError = async (res) => {
+  if (res.status === 429) return 'Demasiados intentos. Espera un minuto e intenta de nuevo.';
+  if (res.status === 403) return 'No tienes permisos para esta acción.';
+
+  const text = await res.text();
+  try {
+    const body = JSON.parse(text);
+    if (body.error) return body.error;
+    if (body.errors) return Object.values(body.errors).flat().join(' ');
+    if (body.title) return body.title;
+  } catch {
+    // no era JSON
   }
+  return text || `Error ${res.status}`;
+};
+
+const request = async (method, endpoint, data) => {
+  const res = await fetch(`${BASE_URL}${endpoint}`, {
+    method,
+    headers: getHeaders(),
+    ...(data !== undefined ? { body: JSON.stringify(data) } : {})
+  });
+
+  if (res.status === 401) {
+    handleUnauthorized();
+    throw new Error('Sesión expirada');
+  }
+
+  if (!res.ok) throw new Error(await parseError(res));
+
+  const text = await res.text();
+  return text ? JSON.parse(text) : {};
+};
+
+export const api = {
+  get: (endpoint) => request('GET', endpoint),
+  post: (endpoint, data) => request('POST', endpoint, data ?? {}),
+  put: (endpoint, data) => request('PUT', endpoint, data ?? {}),
+  delete: (endpoint) => request('DELETE', endpoint)
 };

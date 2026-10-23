@@ -1,5 +1,6 @@
 // contexts/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { parseError } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -105,8 +106,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error || 'Credenciales incorrectas');
+        throw new Error((await parseError(res)) || 'Credenciales incorrectas');
       }
 
       const data = await res.json();
@@ -131,6 +131,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isAdmin = user?.role === 'Admin';
+  const isManager = isAdmin || user?.role === 'Supervisor';
 
   if (loading) {
     return (
@@ -158,6 +159,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       isAuthenticated: !!token,
       isAdmin,
+      isManager,
       loading
     }}>
       {children}

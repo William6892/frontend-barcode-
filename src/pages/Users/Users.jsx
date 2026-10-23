@@ -51,8 +51,8 @@ const UserForm = ({ editingUser, onClose, onSaved, onCreated }) => {
         setError('Las contraseñas no coinciden');
         return;
       }
-      if (formData.password.length < 6) {
-        setError('La contraseña debe tener al menos 6 caracteres');
+      if (formData.password.length < 8) {
+        setError('La contraseña debe tener al menos 8 caracteres');
         return;
       }
     }
@@ -138,7 +138,7 @@ const UserForm = ({ editingUser, onClose, onSaved, onCreated }) => {
                 <div className="uf-input-wrap">
                   <Lock size={14} className="uf-input-icon" />
                   <input
-                    type="password" className="uf-input" placeholder="Mínimo 6 caracteres"
+                    type="password" className="uf-input" placeholder="Mínimo 8 caracteres"
                     value={formData.password} onChange={set('password')} required
                   />
                 </div>

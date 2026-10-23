@@ -16,26 +16,26 @@ const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [totalProducts, setTotalProducts] = useState(0);
   const [totalShipments, setTotalShipments] = useState(0);
-  const [userData, setUserData] = useState({ username: 'Administrador', role: 'Admin' });
+  const [userData, setUserData] = useState({ username: 'Usuario', role: 'Inspector' });
 
   // ✅ Obtener datos del token (seguro, sin guardar en localStorage)
   const getUserDataFromToken = () => {
     const token = localStorage.getItem('token');
-    if (!token) return { username: 'Administrador', role: 'Admin' };
+    if (!token) return { username: 'Usuario', role: 'Inspector' };
     
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       return {
         username: payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] 
           || payload.username 
-          || 'Administrador',
+          || 'Usuario',
         role: payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] 
           || payload.role 
-          || 'Admin'
+          || 'Inspector'
       };
     } catch (e) {
       console.error('Error decodificando token:', e);
-      return { username: 'Administrador', role: 'Admin' };
+      return { username: 'Usuario', role: 'Inspector' };
     }
   };
 
@@ -64,11 +64,12 @@ const MainLayout = () => {
 
   // ✅ Determinar si es Admin desde el token
   const isAdmin = userData.role?.toLowerCase() === 'admin';
+  const isManager = isAdmin || userData.role?.toLowerCase() === 'supervisor';
 
   // ✅ Items de navegación
   const navItems = [
     { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { to: '/shipments/new', icon: <Truck size={20} />, label: 'Envíos' },
+    ...(isManager ? [{ to: '/shipments/new', icon: <Truck size={20} />, label: 'Envíos' }] : []),
     { to: '/scanner', icon: <ScanLine size={20} />, label: 'Escáner' },
     { to: '/audit', icon: <FileSearch size={20} />, label: 'Auditoría' },
   ];

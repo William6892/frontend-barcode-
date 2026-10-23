@@ -6,9 +6,33 @@ import {
   ChevronRight, ChevronLeft, RefreshCw,
   ClipboardList, Check, CircleCheck
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 
+const PAGE_SIZE = 100;
+const HISTORY_LIMIT = 200;
+
+// Pitido corto: agudo si el escaneo entra, grave y largo si falla (el guarda no tiene que mirar la pantalla)
+let audioCtx;
+const beep = (ok) => {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = ok ? 1200 : 220;
+    osc.type = ok ? 'sine' : 'square';
+    gain.gain.value = 0.15;
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + (ok ? 0.12 : 0.5));
+    if (!ok) navigator.vibrate?.([200, 100, 200]);
+  } catch {
+    // sin audio disponible
+  }
+};
+
 const Scanner = () => {
+  const [searchParams] = useSearchParams();
   const [barcode, setBarcode] = useState('');
   const [scannedItems, setScannedItems] = useState([]);
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -32,12 +56,15 @@ const Scanner = () => {
   const loadShipments = async () => {
     try {
       setLoadingShipments(true);
-      const token = localStorage.getItem('token');
-      const response = await api.get('/Shipment?status=Active', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setShipments(response);
-      setFilteredShipments(response);
+      // El backend pagina de a 100: se piden páginas hasta traer todos los envíos activos
+      const all = [];
+      for (let page = 1; ; page++) {
+        const batch = await api.get(`/Shipment?status=Active&page=${page}&pageSize=${PAGE_SIZE}`);
+        all.push(...batch);
+        if (batch.length < PAGE_SIZE) break;
+      }
+      setShipments(all);
+      setFilteredShipments(all);
     } catch (error) {
       toast.error('Error al cargar envíos: ' + error.message);
     } finally {
@@ -71,25 +98,18 @@ const Scanner = () => {
   const loadShipmentDetails = async (shipment) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await api.get(`/Shipment/${shipment.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      console.log('📦 Datos del envío:', response);
+      const response = await api.get(`/Shipment/${shipment.id}`);
 
       setSelectedShipment(response);
 
-      // 🔥 CORREGIDO: usa scannedItems en lugar de barcodes
       const products = response.products.map(p => ({
         id: p.expectedProductId,
         name: p.name,
         model: p.model,
+        expectedQuantity: p.expectedQuantity || 0,
         scannedCount: p.scannedCount || 0,
-        scannedItems: p.scannedItems || []  // ← Guardamos scannedItems completo
+        scannedItems: p.scannedItems || []
       }));
-
-      console.log('📦 Productos con scannedItems:', products);
 
       setExpectedProducts(products);
 
@@ -99,13 +119,13 @@ const Scanner = () => {
           id: `${p.id}-${si.barcode}`,
           barcode: si.barcode,
           productName: p.name,
+          ts: new Date(si.scannedAt).getTime(),
           scannedAt: new Date(si.scannedAt).toLocaleTimeString()
         }))
       );
 
-      console.log('📦 Escaneos reconstruidos:', allScans);
-
-      setScannedItems(allScans.reverse());
+      allScans.sort((a, b) => b.ts - a.ts);
+      setScannedItems(allScans);
       setRecentScans(allScans.slice(0, 5));
 
       setSelectedProductId('');
@@ -119,6 +139,13 @@ const Scanner = () => {
     }
   };
 
+  // Al venir de "Crear envío" se abre directamente el envío recién creado
+  const initialShipmentId = searchParams.get('shipmentId');
+  useEffect(() => {
+    if (initialShipmentId) loadShipmentDetails({ id: initialShipmentId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialShipmentId]);
+
   // ─── Escanear producto ────────────────────────────────────────────────────
   const handleScan = async (e) => {
     e.preventDefault();
@@ -129,42 +156,45 @@ const Scanner = () => {
     }
     if (!selectedProductId) return toast.error('Selecciona a qué equipo pertenece este escaneo');
 
+    const code = barcode.trim();
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await api.post(`/Shipment/${selectedShipment.id}/scan`, {
         expectedProductId: parseInt(selectedProductId),
-        barcode: barcode.trim()
-      }, { headers: { Authorization: `Bearer ${token}` } });
+        barcode: code
+      });
 
-      if (response) {
-        const product = expectedProducts.find(p => p.id == selectedProductId);
-        const newItem = {
-          id: Date.now(),
-          barcode: barcode.trim(),
-          productName: product.name,
-          scannedAt: new Date().toLocaleTimeString()
-        };
+      const product = expectedProducts.find(p => p.id == selectedProductId);
+      const newItem = {
+        id: Date.now(),
+        ts: Date.now(),
+        barcode: code,
+        productName: product.name,
+        scannedAt: new Date().toLocaleTimeString()
+      };
 
-        setScannedItems(prev => [newItem, ...prev]);
-        setRecentScans(prev => [newItem, ...prev].slice(0, 5));
-        setExpectedProducts(prev => prev.map(p =>
-          p.id == selectedProductId
-            ? { 
-                ...p, 
-                scannedCount: (p.scannedCount || 0) + 1,
-                scannedItems: [...(p.scannedItems || []), { barcode: barcode.trim(), scannedAt: new Date().toISOString() }]
-              }
-            : p
-        ));
+      setScannedItems(prev => [newItem, ...prev]);
+      setRecentScans(prev => [newItem, ...prev].slice(0, 5));
+      setExpectedProducts(prev => prev.map(p =>
+        p.id == selectedProductId
+          ? { ...p, scannedCount: response.scannedCount ?? (p.scannedCount || 0) + 1 }
+          : p
+      ));
 
-        new Audio('/beep.mp3').play().catch(() => {});
-        toast.success(`${barcode.trim()} — ${product.name}`, { duration: 1500, position: 'top-center' });
-        setBarcode('');
+      beep(true);
+      const expected = response.expectedQuantity || product.expectedQuantity;
+      const counter = expected ? ` (${response.scannedCount}/${expected})` : '';
+      toast.success(`${code} — ${product.name}${counter}`, { duration: 1500, position: 'top-center' });
+      if (expected && response.scannedCount >= expected) {
+        toast.success(`✅ ${product.name} completo: ${expected} unidades`, { duration: 4000 });
+        setSelectedProductId('');
       }
     } catch (error) {
-      toast.error(error.message || 'Error al registrar el escaneo', { duration: 4000 });
+      beep(false);
+      toast.error(error.message || 'Error al registrar el escaneo', { duration: 5000 });
     } finally {
+      // Se limpia también en error para que el siguiente pistolazo no se pegue al serial malo
+      setBarcode('');
       setLoading(false);
     }
   };
@@ -179,9 +209,10 @@ const Scanner = () => {
   }, [showShipmentSelector, selectedShipment, selectedProductId]);
 
   // ─── Cálculos ─────────────────────────────────────────────────────────────
-  const totalScanned = scannedItems.length;
-  const totalExpected = expectedProducts.length;
-  const progressPercent = totalExpected > 0 ? (totalScanned / totalExpected) * 100 : 0;
+  const totalScanned = expectedProducts.reduce((sum, p) => sum + (p.scannedCount || 0), 0);
+  const totalExpected = expectedProducts.reduce((sum, p) => sum + (p.expectedQuantity || 0), 0);
+  const progressPercent = totalExpected > 0 ? Math.min(100, (totalScanned / totalExpected) * 100) : 0;
+  const pendingProducts = expectedProducts.filter(p => p.expectedQuantity > 0 && p.scannedCount < p.expectedQuantity);
 
   // ─── SELECTOR DE ENVÍO ────────────────────────────────────────────────────
   if (showShipmentSelector) {
@@ -260,9 +291,9 @@ const Scanner = () => {
           ) : (
             <div style={{ display: 'grid', gap: '0.875rem', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
               {filteredShipments.map(shipment => {
-                const scannedCount = shipment.products?.reduce((sum, p) => sum + (p.scannedCount || 0), 0) || 0;
-                const expectedCount = shipment.products?.length || 0;
-                const percent = expectedCount > 0 ? (scannedCount / expectedCount) * 100 : 0;
+                const scannedCount = shipment.totalScanned ?? 0;
+                const expectedCount = shipment.totalExpected ?? 0;
+                const percent = expectedCount > 0 ? Math.min(100, (scannedCount / expectedCount) * 100) : 0;
 
                 return (
                   <button
@@ -302,7 +333,7 @@ const Scanner = () => {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
                       <span>Progreso</span>
-                      <span>{scannedCount} / {expectedCount}</span>
+                      <span>{scannedCount} / {expectedCount || '—'} und</span>
                     </div>
                     <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-full)', height: '5px', overflow: 'hidden' }}>
                       <div style={{ width: `${percent}%`, background: 'var(--color-primary)', height: '100%', borderRadius: 'var(--radius-full)', transition: 'width 0.3s' }} />
@@ -350,7 +381,9 @@ const Scanner = () => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
             <span>Progreso del envío</span>
-            <span style={{ fontWeight: 600 }}>{totalScanned} productos escaneados</span>
+            <span style={{ fontWeight: 600 }}>
+              {totalScanned}{totalExpected > 0 ? ` / ${totalExpected}` : ''} unidades escaneadas
+            </span>
           </div>
           <div style={{ background: 'var(--bg-app)', borderRadius: 'var(--radius-full)', height: '8px', overflow: 'hidden' }}>
             <div style={{
@@ -370,10 +403,12 @@ const Scanner = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {expectedProducts.map(product => {
               const isSelected = selectedProductId == product.id;
+              const isComplete = product.expectedQuantity > 0 && product.scannedCount >= product.expectedQuantity;
               return (
                 <button
                   key={product.id}
                   type="button"
+                  disabled={isComplete}
                   onClick={() => setSelectedProductId(product.id)}
                   style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -381,7 +416,8 @@ const Scanner = () => {
                     background: isSelected ? 'var(--color-primary-bg)' : 'var(--bg-surface)',
                     border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--border-glass)',
                     borderRadius: 'var(--radius-lg)',
-                    cursor: 'pointer',
+                    cursor: isComplete ? 'not-allowed' : 'pointer',
+                    opacity: isComplete ? 0.6 : 1,
                     transition: 'all 0.15s'
                   }}
                 >
@@ -390,9 +426,12 @@ const Scanner = () => {
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>{product.model}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--color-primary)' }}>
-                      {product.scannedCount}
+                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: isComplete ? 'var(--color-success)' : 'var(--color-primary)' }}>
+                      {product.scannedCount}{product.expectedQuantity > 0 && ` / ${product.expectedQuantity}`}
                     </div>
+                    {isComplete && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-success)' }}>Completo</div>
+                    )}
                   </div>
                 </button>
               );
@@ -477,7 +516,9 @@ const Scanner = () => {
               background: 'var(--bg-surface)',
               padding: '3px 10px', borderRadius: 'var(--radius-full)'
             }}>
-              {scannedItems.length} registros
+              {scannedItems.length > HISTORY_LIMIT
+                ? `Últimos ${HISTORY_LIMIT} de ${scannedItems.length}`
+                : `${scannedItems.length} registros`}
             </span>
           </div>
 
@@ -497,7 +538,7 @@ const Scanner = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {scannedItems.map((item, i) => (
+                  {scannedItems.slice(0, HISTORY_LIMIT).map((item, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid var(--border-glass)' }}>
                       <td style={{ padding: '0.7rem 0.75rem', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.9rem' }}>{item.barcode}</td>
                       <td style={{ padding: '0.7rem 0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{item.productName}</td>
@@ -520,19 +561,23 @@ const Scanner = () => {
               fontSize: '0.95rem', fontWeight: 600
             }}
             onClick={async () => {
+              if (pendingProducts.length > 0) {
+                const detail = pendingProducts
+                  .map(p => `• ${p.name}: ${p.scannedCount}/${p.expectedQuantity}`)
+                  .join('\n');
+                if (!window.confirm(`El envío está incompleto:\n${detail}\n\n¿Finalizarlo de todas formas?`)) return;
+              }
               try {
-                const token = localStorage.getItem('token');
-                await api.post(`/Shipment/${selectedShipment.id}/complete`, {}, {
-                  headers: { Authorization: `Bearer ${token}` }
-                });
-                toast.success(`✅ Envío finalizado con ${totalScanned} productos escaneados`);
+                await api.post(`/Shipment/${selectedShipment.id}/complete`);
+                toast.success(`✅ Envío finalizado con ${totalScanned} unidades escaneadas`);
                 setShowShipmentSelector(true);
-              } catch {
-                toast.error('❌ Error al finalizar el envío');
+                loadShipments();
+              } catch (error) {
+                toast.error('❌ Error al finalizar el envío: ' + error.message);
               }
             }}
           >
-            <CircleCheck size={18} /> Finalizar envío ({totalScanned} productos)
+            <CircleCheck size={18} /> Finalizar envío ({totalScanned}{totalExpected > 0 ? ` / ${totalExpected}` : ''} und)
           </button>
         )}
       </div>

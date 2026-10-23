@@ -11,7 +11,7 @@ const ShipmentCreation = () => {
   const [formData, setFormData] = useState({
     shipmentNumber: '', carrier: '', driverName: '', driverDocument: '', vehiclePlate: '', vehicleModel: '', scheduledDate: ''
   });
-  const [products, setProducts] = useState([{ name: '', model: '' }]);
+  const [products, setProducts] = useState([{ name: '', model: '', expectedQuantity: '' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -22,7 +22,8 @@ const ShipmentCreation = () => {
     setProducts(newProds);
   };
 
-  const addProduct = () => setProducts([...products, { name: '', model: '' }]);
+  const addProduct = () => setProducts([...products, { name: '', model: '', expectedQuantity: '' }]);
+  const totalUnits = products.reduce((sum, p) => sum + (parseInt(p.expectedQuantity) || 0), 0);
   const removeProduct = (index) => setProducts(products.filter((_, i) => i !== index));
 
   const handleSubmit = async (e) => {
@@ -32,7 +33,9 @@ const ShipmentCreation = () => {
       const payload = {
         ...formData,
         scheduledDate: formData.scheduledDate ? new Date(formData.scheduledDate).toISOString() : null,
-        expectedProducts: products.filter(p => p.name.trim() !== '')
+        expectedProducts: products
+          .filter(p => p.name.trim() !== '')
+          .map(p => ({ ...p, expectedQuantity: parseInt(p.expectedQuantity) || 0 }))
       };
       const res = await api.post('/Shipment', payload);
       toast.success(`✅ Envío ${res.shipmentNumber || formData.shipmentNumber} creado`);
@@ -61,7 +64,7 @@ const ShipmentCreation = () => {
           <div className="header-stats">
             <span className="stat-item">
               <Package size={16} />
-              {products.length} equipos
+              {products.length} referencias · {totalUnits} und
             </span>
           </div>
         </header>
@@ -221,7 +224,20 @@ const ShipmentCreation = () => {
                         type="text" 
                         className="input-field" 
                         value={prod.model} 
-                        onChange={(e) => handleProductChange(index, 'model', e.target.value)} 
+                        onChange={(e) => handleProductChange(index, 'model', e.target.value)}
+                      />
+                    </div>
+                    <div className="input-group product-input">
+                      <label className="input-label">Unidades a despachar</label>
+                      <input
+                        required
+                        placeholder="Ej: 1200"
+                        type="number"
+                        min="1"
+                        max="100000"
+                        className="input-field"
+                        value={prod.expectedQuantity}
+                        onChange={(e) => handleProductChange(index, 'expectedQuantity', e.target.value)}
                       />
                     </div>
                   </div>

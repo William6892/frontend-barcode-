@@ -30,6 +30,13 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+// Crear envíos es de Admin/Supervisor; el guarda (Inspector) solo escanea
+const ManagerRoute = ({ children }) => {
+  const { isManager } = useAuth();
+  if (!isManager) return <Navigate to="/scanner" replace />;
+  return children;
+};
+
 function AppRoutes() {
   return (
     <Routes>
@@ -40,7 +47,7 @@ function AppRoutes() {
       <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/shipments/new" element={<ShipmentCreation />} />
+        <Route path="/shipments/new" element={<ManagerRoute><ShipmentCreation /></ManagerRoute>} />
         <Route path="/scanner" element={<Scanner />} />
         <Route path="/audit" element={<Audit />} />
         <Route path="/users" element={

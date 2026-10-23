@@ -36,7 +36,7 @@ const Audit = () => {
       toast.loading('Generando consolidado...', { id: 'download-consolidated' });
       
       // 1. Obtener todos los envíos con estado 'Completed'
-      const completedShipments = await api.get('/Shipment?status=Completed', { headers: headers() });
+      const completedShipments = await api.get('/Shipment?status=Completed&pageSize=100');
       
       if (!completedShipments || completedShipments.length === 0) {
         toast.dismiss('download-consolidated');
