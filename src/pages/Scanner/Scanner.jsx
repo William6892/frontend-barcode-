@@ -1,16 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-import { 
-  ScanBarcode, AlertCircle, CheckCircle2, Search, Truck, 
-  Package, User, CreditCard, Calendar, MapPin,
-  ChevronRight, ChevronLeft, RefreshCw,
-  ClipboardList, Check, CircleCheck
+import {
+  ScanBarcode, Search, Truck, User, CreditCard, ChevronRight, ChevronLeft,
+  RefreshCw, CircleCheck, CheckCircle2, XCircle, PackageOpen, History
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
+import './Scanner.css';
 
 const PAGE_SIZE = 100;
 const HISTORY_LIMIT = 200;
+
+const fmt = (n) => (n ?? 0).toLocaleString('es-CO');
 
 // Pitido corto: agudo si el escaneo entra, grave y largo si falla (el guarda no tiene que mirar la pantalla)
 let audioCtx;
@@ -31,6 +32,29 @@ const beep = (ok) => {
   }
 };
 
+const percentOf = (done, total) => (total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0);
+const toneOf = (pct, total) => (total === 0 ? 'open' : pct >= 100 ? 'done' : pct >= 75 ? 'near' : 'active');
+
+// Anillo de progreso por referencia
+const Ring = ({ pct, tone, size = 54 }) => {
+  const r = (size - 8) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg width={size} height={size} className={`ring ring--${tone}`} aria-hidden="true">
+      <circle cx={size / 2} cy={size / 2} r={r} className="ring-track" />
+      <circle cx={size / 2} cy={size / 2} r={r} className="ring-fill"
+        strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} />
+    </svg>
+  );
+};
+
+const SEARCH_TYPES = [
+  { value: 'all', label: 'Todo' },
+  { value: 'number', label: 'Nº envío' },
+  { value: 'plate', label: 'Placa' },
+  { value: 'driver', label: 'Conductor' },
+];
+
 const Scanner = () => {
   const [searchParams] = useSearchParams();
   const [barcode, setBarcode] = useState('');
@@ -39,20 +63,16 @@ const Scanner = () => {
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [expectedProducts, setExpectedProducts] = useState([]);
   const [shipments, setShipments] = useState([]);
-  const [filteredShipments, setFilteredShipments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchType, setSearchType] = useState('all');
   const [loading, setLoading] = useState(false);
   const [loadingShipments, setLoadingShipments] = useState(true);
   const [showShipmentSelector, setShowShipmentSelector] = useState(true);
-  const [recentScans, setRecentScans] = useState([]);
+  const [lastResult, setLastResult] = useState(null);
+  const [flash, setFlash] = useState(null);
   const inputRef = useRef(null);
 
   // ─── Cargar envíos activos ────────────────────────────────────────────────
-  useEffect(() => {
-    loadShipments();
-  }, []);
-
   const loadShipments = async () => {
     try {
       setLoadingShipments(true);
@@ -64,7 +84,6 @@ const Scanner = () => {
         if (batch.length < PAGE_SIZE) break;
       }
       setShipments(all);
-      setFilteredShipments(all);
     } catch (error) {
       toast.error('Error al cargar envíos: ' + error.message);
     } finally {
@@ -72,27 +91,21 @@ const Scanner = () => {
     }
   };
 
-  // ─── Filtro de búsqueda ──────────────────────────────────────────────────
   useEffect(() => {
-    let filtered = [...shipments];
-    if (searchTerm) {
-      filtered = filtered.filter(shipment => {
-        const term = searchTerm.toLowerCase();
-        switch (searchType) {
-          case 'number': return shipment.shipmentNumber?.toLowerCase().includes(term);
-          case 'plate':  return shipment.vehiclePlate?.toLowerCase().includes(term);
-          case 'driver': return shipment.driverName?.toLowerCase().includes(term);
-          default:
-            return (
-              shipment.shipmentNumber?.toLowerCase().includes(term) ||
-              shipment.vehiclePlate?.toLowerCase().includes(term) ||
-              shipment.driverName?.toLowerCase().includes(term)
-            );
-        }
-      });
-    }
-    setFilteredShipments(filtered);
-  }, [searchTerm, shipments, searchType]);
+    loadShipments();
+  }, []);
+
+  // ─── Filtro de búsqueda ──────────────────────────────────────────────────
+  const term = searchTerm.trim().toLowerCase();
+  const filteredShipments = !term ? shipments : shipments.filter(s => {
+    const fields = {
+      number: [s.shipmentNumber],
+      plate: [s.vehiclePlate],
+      driver: [s.driverName],
+      all: [s.shipmentNumber, s.vehiclePlate, s.driverName, s.carrier],
+    }[searchType];
+    return fields.some(f => f?.toLowerCase().includes(term));
+  });
 
   // ─── Cargar detalles del envío ──────────────────────────────────────────
   const loadShipmentDetails = async (shipment) => {
@@ -120,18 +133,18 @@ const Scanner = () => {
           barcode: si.barcode,
           productName: p.name,
           ts: new Date(si.scannedAt).getTime(),
-          scannedAt: new Date(si.scannedAt).toLocaleTimeString()
+          scannedAt: new Date(si.scannedAt).toLocaleTimeString('es-CO')
         }))
       );
 
       allScans.sort((a, b) => b.ts - a.ts);
       setScannedItems(allScans);
-      setRecentScans(allScans.slice(0, 5));
 
-      setSelectedProductId('');
+      // Si solo queda una referencia por llenar, se deja seleccionada para no hacer clic de más
+      const open = products.filter(p => !(p.expectedQuantity > 0 && p.scannedCount >= p.expectedQuantity));
+      setSelectedProductId(open.length === 1 ? open[0].id : '');
+      setLastResult(null);
       setShowShipmentSelector(false);
-
-      toast.success(`Envío ${response.shipmentNumber} seleccionado`);
     } catch (error) {
       toast.error('Error al cargar el envío: ' + error.message);
     } finally {
@@ -143,18 +156,21 @@ const Scanner = () => {
   const initialShipmentId = searchParams.get('shipmentId');
   useEffect(() => {
     if (initialShipmentId) loadShipmentDetails({ id: initialShipmentId });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialShipmentId]);
+
+  const showFlash = (ok) => setFlash({ ok, key: Date.now() });
 
   // ─── Escanear producto ────────────────────────────────────────────────────
   const handleScan = async (e) => {
     e.preventDefault();
-    if (!barcode.trim()) return toast.error('Ingresa un código de barras');
-    if (!selectedShipment) {
-      setShowShipmentSelector(true);
-      return toast.error('Selecciona un envío primero');
+    if (!barcode.trim()) return;
+    if (!selectedProductId) {
+      beep(false);
+      showFlash(false);
+      setLastResult({ ok: false, code: barcode.trim(), message: 'Primero toca la referencia que vas a escanear' });
+      setBarcode('');
+      return;
     }
-    if (!selectedProductId) return toast.error('Selecciona a qué equipo pertenece este escaneo');
 
     const code = barcode.trim();
     setLoading(true);
@@ -170,11 +186,10 @@ const Scanner = () => {
         ts: Date.now(),
         barcode: code,
         productName: product.name,
-        scannedAt: new Date().toLocaleTimeString()
+        scannedAt: new Date().toLocaleTimeString('es-CO')
       };
 
       setScannedItems(prev => [newItem, ...prev]);
-      setRecentScans(prev => [newItem, ...prev].slice(0, 5));
       setExpectedProducts(prev => prev.map(p =>
         p.id == selectedProductId
           ? { ...p, scannedCount: response.scannedCount ?? (p.scannedCount || 0) + 1 }
@@ -182,16 +197,22 @@ const Scanner = () => {
       ));
 
       beep(true);
+      showFlash(true);
       const expected = response.expectedQuantity || product.expectedQuantity;
-      const counter = expected ? ` (${response.scannedCount}/${expected})` : '';
-      toast.success(`${code} — ${product.name}${counter}`, { duration: 1500, position: 'top-center' });
-      if (expected && response.scannedCount >= expected) {
-        toast.success(`✅ ${product.name} completo: ${expected} unidades`, { duration: 4000 });
-        setSelectedProductId('');
-      }
+      const isComplete = expected && response.scannedCount >= expected;
+      setLastResult({
+        ok: true,
+        code,
+        message: isComplete
+          ? `${product.name} completo: ${fmt(expected)} unidades`
+          : `${product.name}${expected ? ` · ${fmt(response.scannedCount)} de ${fmt(expected)}` : ''}`,
+        complete: isComplete
+      });
+      if (isComplete) setSelectedProductId('');
     } catch (error) {
       beep(false);
-      toast.error(error.message || 'Error al registrar el escaneo', { duration: 5000 });
+      showFlash(false);
+      setLastResult({ ok: false, code, message: error.message || 'Error al registrar el escaneo' });
     } finally {
       // Se limpia también en error para que el siguiente pistolazo no se pegue al serial malo
       setBarcode('');
@@ -201,385 +222,255 @@ const Scanner = () => {
 
   // ─── Auto-focus ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!showShipmentSelector && selectedShipment && selectedProductId) {
+    if (!showShipmentSelector && selectedShipment) {
       inputRef.current?.focus();
-      const interval = setInterval(() => inputRef.current?.focus(), 2000);
+      const interval = setInterval(() => {
+        // no roba el foco si el usuario está escribiendo en otro campo
+        if (document.activeElement?.tagName !== 'INPUT') inputRef.current?.focus();
+      }, 1500);
       return () => clearInterval(interval);
     }
   }, [showShipmentSelector, selectedShipment, selectedProductId]);
 
+  const finishShipment = async () => {
+    if (pendingProducts.length > 0) {
+      const detail = pendingProducts
+        .map(p => `• ${p.name}: ${p.scannedCount}/${p.expectedQuantity}`)
+        .join('\n');
+      if (!window.confirm(`El envío está incompleto:\n${detail}\n\n¿Finalizarlo de todas formas?`)) return;
+    }
+    try {
+      await api.post(`/Shipment/${selectedShipment.id}/complete`);
+      toast.success(`Envío ${selectedShipment.shipmentNumber} finalizado con ${fmt(totalScanned)} unidades`);
+      setShowShipmentSelector(true);
+      loadShipments();
+    } catch (error) {
+      toast.error('Error al finalizar el envío: ' + error.message);
+    }
+  };
+
   // ─── Cálculos ─────────────────────────────────────────────────────────────
   const totalScanned = expectedProducts.reduce((sum, p) => sum + (p.scannedCount || 0), 0);
   const totalExpected = expectedProducts.reduce((sum, p) => sum + (p.expectedQuantity || 0), 0);
-  const progressPercent = totalExpected > 0 ? Math.min(100, (totalScanned / totalExpected) * 100) : 0;
+  const progressPercent = percentOf(totalScanned, totalExpected);
   const pendingProducts = expectedProducts.filter(p => p.expectedQuantity > 0 && p.scannedCount < p.expectedQuantity);
+  const selectedProduct = expectedProducts.find(p => p.id == selectedProductId);
 
   // ─── SELECTOR DE ENVÍO ────────────────────────────────────────────────────
   if (showShipmentSelector) {
     return (
-      <div className="scanner-container" style={{ minHeight: '100vh', background: 'var(--bg-gradient)', padding: '2rem' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-
-          <div style={{ marginBottom: '2rem' }}>
-            <h1 style={{ fontSize: '2rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-              Escáner de despacho
-            </h1>
-            <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.95rem' }}>
-              Selecciona un envío activo para comenzar
-            </p>
+      <div className="scan-select animate-slide-up">
+        <header className="page-header">
+          <div>
+            <h1 className="page-title">¿Qué envío vas a cargar?</h1>
+            <p className="page-subtitle">{shipments.length} envíos activos · toca uno para empezar a escanear</p>
           </div>
+          <button className="btn btn-glass" onClick={loadShipments} disabled={loadingShipments}>
+            <RefreshCw size={16} className={loadingShipments ? 'spin' : ''} /> Actualizar
+          </button>
+        </header>
 
-          <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: 2, position: 'relative' }}>
-                <Search size={16} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  placeholder="Buscar..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                    fontSize: '0.95rem',
-                    borderRadius: 'var(--radius-lg)',
-                    background: 'var(--bg-surface)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border-glass)',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <select
-                  value={searchType}
-                  onChange={e => setSearchType(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: 'var(--radius-lg)',
-                    background: 'var(--bg-surface)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border-glass)',
-                    outline: 'none',
-                    fontSize: '0.95rem'
-                  }}
-                >
-                  <option value="all">Todo</option>
-                  <option value="number">Nº Envío</option>
-                  <option value="plate">Placa</option>
-                  <option value="driver">Conductor</option>
-                </select>
-              </div>
-              <button onClick={loadShipments} className="btn btn-glass" style={{ padding: '0 1rem' }}>
-                <RefreshCw size={18} />
+        <div className="search-bar">
+          <Search size={18} className="search-icon" />
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Buscar por número de envío, placa, conductor o transportadora"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            autoFocus
+          />
+          <div className="chip-group" role="radiogroup" aria-label="Buscar en">
+            {SEARCH_TYPES.map(t => (
+              <button key={t.value} type="button" role="radio" aria-checked={searchType === t.value}
+                className={`chip ${searchType === t.value ? 'is-active' : ''}`}
+                onClick={() => setSearchType(t.value)}>
+                {t.label}
               </button>
-            </div>
-          </div>
-
-          {loadingShipments ? (
-            <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-              <div className="spinner" style={{ width: '36px', height: '36px', margin: '0 auto 1rem' }} />
-              <p style={{ color: 'var(--text-muted)' }}>Cargando envíos activos...</p>
-            </div>
-          ) : filteredShipments.length === 0 ? (
-            <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-              <Package size={44} style={{ margin: '0 auto 1rem', opacity: 0.25, display: 'block' }} />
-              <p style={{ fontSize: '1.1rem', marginBottom: '0.4rem', color: 'var(--text-primary)' }}>No hay envíos activos</p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Crea un nuevo envío para comenzar a escanear</p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '0.875rem', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
-              {filteredShipments.map(shipment => {
-                const scannedCount = shipment.totalScanned ?? 0;
-                const expectedCount = shipment.totalExpected ?? 0;
-                const percent = expectedCount > 0 ? Math.min(100, (scannedCount / expectedCount) * 100) : 0;
-
-                return (
-                  <button
-                    key={shipment.id}
-                    onClick={() => loadShipmentDetails(shipment)}
-                    className="glass-panel"
-                    style={{
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      border: '1px solid var(--border-glass)',
-                      padding: '1.25rem',
-                      transition: 'transform 0.2s, box-shadow 0.2s'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.875rem' }}>
-                      <div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--color-primary)' }}>
-                          {shipment.shipmentNumber}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          {shipment.carrier}
-                        </div>
-                      </div>
-                      <ChevronRight size={18} style={{ color: 'var(--text-muted)', marginTop: '2px' }} />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <User size={13} /> {shipment.driverName}
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <Truck size={13} /> {shipment.vehiclePlate}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                      <span>Progreso</span>
-                      <span>{scannedCount} / {expectedCount || '—'} und</span>
-                    </div>
-                    <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-full)', height: '5px', overflow: 'hidden' }}>
-                      <div style={{ width: `${percent}%`, background: 'var(--color-primary)', height: '100%', borderRadius: 'var(--radius-full)', transition: 'width 0.3s' }} />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ─── ESCÁNER ──────────────────────────────────────────────────────────────
-  return (
-    <div className="scanner-container" style={{ minHeight: '100vh', background: 'var(--bg-gradient)', padding: '2rem' }}>
-      <div style={{ maxWidth: '760px', margin: '0 auto' }}>
-
-        <button
-          onClick={() => setShowShipmentSelector(true)}
-          className="btn btn-glass"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1.1rem', marginBottom: '1.25rem', fontSize: '0.9rem' }}
-        >
-          <ChevronLeft size={16} /> Cambiar envío
-        </button>
-
-        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', background: 'linear-gradient(135deg, var(--color-primary-bg), var(--bg-surface))' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
-                Envío activo
-              </div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {selectedShipment?.shipmentNumber}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Truck size={13} /> {selectedShipment?.carrier}</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><User size={13} /> {selectedShipment?.driverName}</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><CreditCard size={13} /> {selectedShipment?.vehiclePlate}</span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
-            <span>Progreso del envío</span>
-            <span style={{ fontWeight: 600 }}>
-              {totalScanned}{totalExpected > 0 ? ` / ${totalExpected}` : ''} unidades escaneadas
-            </span>
-          </div>
-          <div style={{ background: 'var(--bg-app)', borderRadius: 'var(--radius-full)', height: '8px', overflow: 'hidden' }}>
-            <div style={{
-              width: `${progressPercent}%`,
-              background: 'var(--color-primary)',
-              height: '100%',
-              borderRadius: 'var(--radius-full)',
-              transition: 'width 0.3s'
-            }} />
+            ))}
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.875rem' }}>
-            Producto a escanear
+        {loadingShipments ? (
+          <div className="ship-grid">
+            {Array.from({ length: 6 }).map((_, i) => <div key={i} className="ship-card skeleton" />)}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {expectedProducts.map(product => {
-              const isSelected = selectedProductId == product.id;
-              const isComplete = product.expectedQuantity > 0 && product.scannedCount >= product.expectedQuantity;
+        ) : filteredShipments.length === 0 ? (
+          <div className="empty-big">
+            <PackageOpen size={44} />
+            <p className="empty-big-title">{shipments.length === 0 ? 'No hay envíos activos' : 'Ningún envío coincide'}</p>
+            <p>{shipments.length === 0 ? 'Cuando un supervisor cree un envío aparecerá aquí.' : 'Prueba con otro número, placa o conductor.'}</p>
+          </div>
+        ) : (
+          <div className="ship-grid">
+            {filteredShipments.map(shipment => {
+              const pct = percentOf(shipment.totalScanned, shipment.totalExpected);
+              const tone = toneOf(pct, shipment.totalExpected);
               return (
-                <button
-                  key={product.id}
-                  type="button"
-                  disabled={isComplete}
-                  onClick={() => setSelectedProductId(product.id)}
-                  style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '0.875rem 1rem',
-                    background: isSelected ? 'var(--color-primary-bg)' : 'var(--bg-surface)',
-                    border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--border-glass)',
-                    borderRadius: 'var(--radius-lg)',
-                    cursor: isComplete ? 'not-allowed' : 'pointer',
-                    opacity: isComplete ? 0.6 : 1,
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.975rem', color: 'var(--text-primary)' }}>{product.name}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>{product.model}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: isComplete ? 'var(--color-success)' : 'var(--color-primary)' }}>
-                      {product.scannedCount}{product.expectedQuantity > 0 && ` / ${product.expectedQuantity}`}
+                <button key={shipment.id} className={`ship-card ship-card--${tone}`}
+                  onClick={() => loadShipmentDetails(shipment)} disabled={loading}>
+                  <div className="ship-card-top">
+                    <div>
+                      <div className="ship-card-number mono">{shipment.shipmentNumber}</div>
+                      <div className="ship-card-carrier">{shipment.carrier || 'Sin transportadora'}</div>
                     </div>
-                    {isComplete && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-success)' }}>Completo</div>
-                    )}
+                    <span className={`pct-badge pct-badge--${tone}`}>
+                      {shipment.totalExpected ? `${pct}%` : 'Abierto'}
+                    </span>
+                  </div>
+                  <div className="ship-card-meta">
+                    <span><User size={14} /> {shipment.driverName}</span>
+                    <span><Truck size={14} /> {shipment.vehiclePlate}</span>
+                  </div>
+                  <div className={`progress progress--${tone === 'open' ? 'active' : tone}`}>
+                    <span style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="ship-card-foot">
+                    <span className="tabular"><strong>{fmt(shipment.totalScanned)}</strong> / {shipment.totalExpected ? fmt(shipment.totalExpected) : '—'} und</span>
+                    <span className="ship-card-go">Escanear <ChevronRight size={15} /></span>
                   </div>
                 </button>
               );
             })}
           </div>
-        </div>
-
-        <form onSubmit={handleScan}>
-          <div className="glass-panel" style={{ padding: '2rem 1.5rem', textAlign: 'center', marginBottom: '1rem' }}>
-            <div style={{
-              width: '56px', height: '56px',
-              background: 'var(--color-primary-bg)',
-              borderRadius: 'var(--radius-lg)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 1.25rem'
-            }}>
-              <ScanBarcode size={28} style={{ color: 'var(--color-primary)' }} />
-            </div>
-            <div style={{ position: 'relative' }}>
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder="Escanea el código de barras aquí..."
-                value={barcode}
-                onChange={e => setBarcode(e.target.value)}
-                disabled={!selectedProductId || loading}
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '1rem 3rem 1rem 1rem',
-                  fontSize: '1.5rem',
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  letterSpacing: '2px',
-                  borderRadius: 'var(--radius-full)',
-                  border: 'none',
-                  background: 'var(--bg-app)',
-                  color: 'var(--color-primary)',
-                  outline: 'none'
-                }}
-              />
-              <div style={{
-                position: 'absolute',
-                right: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '10px', height: '10px',
-                background: loading ? 'orange' : (barcode ? 'var(--color-success)' : '#ef4444'),
-                borderRadius: '50%'
-              }} />
-            </div>
-            <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
-              {loading ? 'Procesando...' : 'El campo se mantiene enfocado para lectura continua'}
-            </p>
-          </div>
-        </form>
-
-        {recentScans.length > 0 && (
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-            {recentScans.map((scan, i) => (
-              <span key={i} style={{
-                display: 'flex', alignItems: 'center', gap: '5px',
-                background: 'var(--color-success-bg)',
-                color: 'var(--color-success)',
-                padding: '4px 12px',
-                borderRadius: 'var(--radius-full)',
-                fontSize: '0.825rem'
-              }}>
-                <Check size={12} /> {scan.barcode}
-              </span>
-            ))}
-          </div>
         )}
+      </div>
+    );
+  }
 
-        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-              <ClipboardList size={16} /> Historial de escaneos
-            </h3>
-            <span style={{
-              fontSize: '0.78rem', color: 'var(--text-muted)',
-              background: 'var(--bg-surface)',
-              padding: '3px 10px', borderRadius: 'var(--radius-full)'
-            }}>
-              {scannedItems.length > HISTORY_LIMIT
-                ? `Últimos ${HISTORY_LIMIT} de ${scannedItems.length}`
-                : `${scannedItems.length} registros`}
-            </span>
+  // ─── MODO GUARDA ───────────────────────────────────────────────────────────
+  const readyToScan = Boolean(selectedProductId);
+
+  return (
+    <div className="guard">
+      {flash && <div key={flash.key} className={`scan-flash scan-flash--${flash.ok ? 'ok' : 'error'}`} />}
+
+      <header className="guard-head">
+        <button className="guard-back" onClick={() => setShowShipmentSelector(true)}>
+          <ChevronLeft size={18} /> Envíos
+        </button>
+        <div className="guard-ship">
+          <span className="guard-eyebrow">Envío en carga</span>
+          <h1 className="guard-ship-number mono">{selectedShipment?.shipmentNumber}</h1>
+          <div className="guard-ship-meta">
+            <span><Truck size={15} /> {selectedShipment?.carrier}</span>
+            <span><User size={15} /> {selectedShipment?.driverName}</span>
+            <span><CreditCard size={15} /> {selectedShipment?.vehiclePlate}</span>
+          </div>
+        </div>
+        <div className="guard-total">
+          <div className="guard-total-value tabular">
+            {fmt(totalScanned)}<span> / {totalExpected ? fmt(totalExpected) : '—'}</span>
+          </div>
+          <div className="guard-total-label">unidades cargadas{totalExpected ? ` · ${progressPercent}%` : ''}</div>
+          <div className={`progress progress--dark progress--${toneOf(progressPercent, totalExpected) === 'open' ? 'active' : toneOf(progressPercent, totalExpected)}`}>
+            <span style={{ width: `${progressPercent}%` }} />
+          </div>
+        </div>
+      </header>
+
+      <div className="guard-body">
+        <section className="guard-main">
+          <div className="guard-step">
+            <span className="step-num">1</span>
+            <span>Toca la referencia que vas a cargar</span>
+          </div>
+          <div className="ref-grid">
+            {expectedProducts.map(product => {
+              const isSelected = selectedProductId == product.id;
+              const pct = percentOf(product.scannedCount, product.expectedQuantity);
+              const tone = toneOf(pct, product.expectedQuantity);
+              const isComplete = tone === 'done';
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  disabled={isComplete}
+                  className={`ref-card ref-card--${tone} ${isSelected ? 'is-selected' : ''}`}
+                  onClick={() => { setSelectedProductId(product.id); inputRef.current?.focus(); }}
+                  aria-pressed={isSelected}
+                >
+                  <div className="ref-ring">
+                    <Ring pct={product.expectedQuantity ? pct : 0} tone={tone} />
+                    {isComplete ? <CheckCircle2 size={20} className="ref-ring-icon" /> : <span className="ref-ring-pct">{product.expectedQuantity ? `${pct}%` : '∞'}</span>}
+                  </div>
+                  <div className="ref-info">
+                    <div className="ref-name">{product.name}</div>
+                    <div className="ref-model mono">{product.model}</div>
+                  </div>
+                  <div className="ref-count tabular">
+                    {fmt(product.scannedCount)}
+                    {product.expectedQuantity > 0 && <span>/ {fmt(product.expectedQuantity)}</span>}
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
-          {scannedItems.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem 0', color: 'var(--text-muted)' }}>
-              <ScanBarcode size={40} style={{ opacity: 0.2, margin: '0 auto 0.75rem', display: 'block' }} />
-              <p style={{ fontSize: '0.9rem' }}>Esperando el primer escaneo...</p>
-            </div>
-          ) : (
-            <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-glass)' }}>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Código</th>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Producto</th>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hora</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scannedItems.slice(0, HISTORY_LIMIT).map((item, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border-glass)' }}>
-                      <td style={{ padding: '0.7rem 0.75rem', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.9rem' }}>{item.barcode}</td>
-                      <td style={{ padding: '0.7rem 0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{item.productName}</td>
-                      <td style={{ padding: '0.7rem 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.scannedAt}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="guard-step">
+            <span className="step-num">2</span>
+            <span>Escanea el serial con la pistola</span>
+          </div>
+          <form onSubmit={handleScan} className={`scan-box ${readyToScan ? 'is-ready' : 'is-waiting'}`}>
+            <ScanBarcode size={30} className="scan-box-icon" />
+            <input
+              ref={inputRef}
+              type="text"
+              className="scan-input mono"
+              placeholder={readyToScan ? 'Esperando lectura…' : 'Primero elige una referencia'}
+              value={barcode}
+              onChange={e => setBarcode(e.target.value)}
+              disabled={loading}
+              autoComplete="off"
+              spellCheck="false"
+              aria-label="Serial escaneado"
+            />
+            <span className="scan-status">
+              <span className="scan-status-dot" />
+              {readyToScan ? `Cargando: ${selectedProduct?.name}` : 'Sin referencia'}
+            </span>
+          </form>
+
+          {lastResult && (
+            <div key={lastResult.code + lastResult.ok} className={`last-scan ${lastResult.ok ? 'is-ok' : 'is-error'}`}>
+              {lastResult.ok ? <CheckCircle2 size={34} /> : <XCircle size={34} />}
+              <div className="last-scan-text">
+                <span className="last-scan-code mono">{lastResult.code}</span>
+                <span className="last-scan-msg">{lastResult.message}</span>
+              </div>
             </div>
           )}
-        </div>
+        </section>
 
-        {totalScanned > 0 && (
-          <button
-            className="btn btn-primary w-full"
-            style={{
-              padding: '0.9rem',
-              background: 'linear-gradient(135deg, var(--color-success), #059669)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              fontSize: '0.95rem', fontWeight: 600
-            }}
-            onClick={async () => {
-              if (pendingProducts.length > 0) {
-                const detail = pendingProducts
-                  .map(p => `• ${p.name}: ${p.scannedCount}/${p.expectedQuantity}`)
-                  .join('\n');
-                if (!window.confirm(`El envío está incompleto:\n${detail}\n\n¿Finalizarlo de todas formas?`)) return;
-              }
-              try {
-                await api.post(`/Shipment/${selectedShipment.id}/complete`);
-                toast.success(`✅ Envío finalizado con ${totalScanned} unidades escaneadas`);
-                setShowShipmentSelector(true);
-                loadShipments();
-              } catch (error) {
-                toast.error('❌ Error al finalizar el envío: ' + error.message);
-              }
-            }}
-          >
-            <CircleCheck size={18} /> Finalizar envío ({totalScanned}{totalExpected > 0 ? ` / ${totalExpected}` : ''} und)
+        <aside className="guard-side">
+          <div className="history">
+            <div className="history-head">
+              <span><History size={16} /> Últimos escaneos</span>
+              <span className="history-count tabular">
+                {scannedItems.length > HISTORY_LIMIT ? `${HISTORY_LIMIT} de ${fmt(scannedItems.length)}` : fmt(scannedItems.length)}
+              </span>
+            </div>
+            {scannedItems.length === 0 ? (
+              <div className="history-empty">Aún no hay escaneos en este envío</div>
+            ) : (
+              <ol className="history-list">
+                {scannedItems.slice(0, HISTORY_LIMIT).map((item, i) => (
+                  <li key={item.id} className={i === 0 ? 'is-new' : ''}>
+                    <span className="history-code mono">{item.barcode}</span>
+                    <span className="history-product">{item.productName}</span>
+                    <span className="history-time tabular">{item.scannedAt}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+
+          <button className={`finish-btn ${pendingProducts.length === 0 && totalScanned > 0 ? 'is-ready' : ''}`}
+            onClick={finishShipment} disabled={totalScanned === 0}>
+            <CircleCheck size={20} />
+            {pendingProducts.length === 0 && totalScanned > 0 ? 'Finalizar envío' : 'Finalizar envío (incompleto)'}
           </button>
-        )}
+        </aside>
       </div>
     </div>
   );

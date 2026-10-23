@@ -1,63 +1,83 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
 
+/*
+ * Sistema visual "Control de Salidas"
+ * - Tinta azul marino para estructura (sidebar, títulos), azul Samsung para acciones
+ * - Colores de estado con significado fijo: en curso (azul), completo (verde),
+ *   pendiente/incompleto (ámbar), error (rojo). Nunca se usan como decoración.
+ */
 :root {
-  /* ================== COLOR PALETTE ================== */
-  /* Backgrounds (Light & Clean) */
-  --bg-app: #f5f7fa;
-  --bg-surface: rgba(255, 255, 255, 0.85);
-  --bg-surface-hover: rgba(255, 255, 255, 0.95);
+  /* Marca y estructura */
+  --brand: #1428a0;
+  --ink-900: #0b1437;
+  --ink-800: #121d4a;
+  --ink-700: #1c2a5e;
+  --ink-500: #4b5a8a;
+
+  /* Fondos */
+  --bg-app: #eef1f6;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f8fafc;
   --bg-surface-active: #ffffff;
-  --bg-input: #f0f2f5;
-  
-  /* Primary & Accents (Fresh Blue) */
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-glow: rgba(37, 99, 235, 0.2);
-  
-  --color-success: #059669;
-  --color-success-bg: rgba(5, 150, 105, 0.1);
-  
-  --color-danger: #dc2626;
-  --color-danger-bg: rgba(220, 38, 38, 0.1);
-  
-  --color-warning: #d97706;
-  --color-warning-bg: rgba(217, 119, 6, 0.1);
+  --bg-input: #f3f5f9;
+  --bg-subtle: #f6f8fb;
 
-  /* Typography */
-  --text-primary: #1e293b;
+  /* Acción principal */
+  --color-primary: #2152e0;
+  --color-primary-hover: #1a43bd;
+  --color-primary-bg: #e9efff;
+  --color-primary-glow: rgba(33, 82, 224, 0.18);
+
+  /* Estados */
+  --color-success: #047857;
+  --color-success-strong: #10b981;
+  --color-success-bg: #e6f6ef;
+  --color-danger: #c81e1e;
+  --color-danger-strong: #ef4444;
+  --color-danger-bg: #fdecec;
+  --color-warning: #b45309;
+  --color-warning-strong: #f59e0b;
+  --color-warning-bg: #fef4e2;
+
+  /* Texto */
+  --text-primary: #0f172a;
   --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  
-  /* Borders */
-  --border-glass: rgba(0, 0, 0, 0.06);
-  --border-glass-strong: rgba(0, 0, 0, 0.12);
+  --text-muted: #7b879c;
 
-  /* Shadows (Softer) */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --shadow-glow: 0 0 30px var(--color-primary-glow);
+  /* Bordes */
+  --border-glass: #e3e8ef;
+  --border-glass-strong: #cdd5e0;
 
-  /* Radii (Samsung rounded style) */
+  /* Sombras: casi planas, la jerarquía la da el color y el tamaño */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.07);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.10);
+  --shadow-glow: 0 6px 20px var(--color-primary-glow);
+
+  /* Radios */
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
-  --radius-lg: 1.25rem;
-  --radius-xl: 1.75rem;
-  --radius-2xl: 2.5rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
   --radius-full: 9999px;
 
-  /* Transitions */
-  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Tipografía */
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --color-text-primary: #1e293b;
-  --color-text-secondary: #64748b;
+  /* Transiciones */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
   --color-background-primary: #ffffff;
-  --color-background-secondary: #f8fafc;
-  --color-border-primary: #2563eb;
-  --color-border-secondary: #e2e8f0;
-  --color-border-tertiary: #e2e8f0;
+  --color-background-secondary: var(--bg-subtle);
+  --color-border-primary: var(--color-primary);
+  --color-border-secondary: var(--border-glass);
+  --color-border-tertiary: var(--border-glass);
   --border-radius-sm: 4px;
   --border-radius-md: 8px;
   --border-radius-lg: 12px;
@@ -71,41 +91,53 @@
 }
 
 html, body {
-  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg-app);
   color: var(--text-primary);
-  line-height: 1.6;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
   overflow-x: hidden;
 }
 
-/* Custom Scrollbar (Light) */
+/* Los controles no heredan la fuente por defecto: sin esto salen en Arial */
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-primary-glow);
+  outline-offset: 2px;
+}
+
+.mono { font-family: var(--font-mono); }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-app);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #c7cfdb;
   border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #98a4b8;
 }
 
-/* ================== GLASSMORPHISM UTILITIES ================== */
+/* ================== SUPERFICIES ================== */
 .glass-panel {
   background: var(--bg-surface);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .glass-panel:hover {
@@ -132,6 +164,70 @@ p {
 .text-danger { color: var(--color-danger); }
 
 /* ================== COMMON COMPONENTS ================== */
+
+/* ---------- Encabezado de página (reutilizable) ---------- */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.page-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.page-subtitle .sep { opacity: 0.6; }
+
+.page-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.page-actions .btn {
+  padding: 0.6rem 1.1rem;
+  font-size: 0.9rem;
+}
+
+/* Barra de progreso (reutilizable): azul en curso, ámbar casi lista, verde completa */
+.progress {
+  flex: 1 1 auto;
+  height: 8px;
+  background: #e8ecf3;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress--near > span { background: var(--color-warning-strong); }
+.progress--done > span { background: var(--color-success-strong); }
+
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 
 /* Buttons */
 .btn {

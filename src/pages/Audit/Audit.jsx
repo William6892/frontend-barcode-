@@ -238,9 +238,9 @@ const Audit = () => {
   // ─── DETALLE ──────────────────────────────────────────────────────────────
   if (selectedShipment) {
     const products = selectedShipment.products || [];
-    const totalExpected = products.length;
+    const totalExpected = products.reduce((s, p) => s + (p.expectedQuantity || 0), 0);
     const totalScanned = products.reduce((s, p) => s + (p.scannedCount || 0), 0);
-    const pct = totalExpected > 0 ? Math.round((totalScanned / totalExpected) * 100) : 0;
+    const pct = totalExpected > 0 ? Math.min(100, Math.round((totalScanned / totalExpected) * 100)) : 0;
 
     return (
       <div className="animate-slide-up" style={{ maxWidth: '900px', margin: '0 auto', paddingBottom: '3rem' }}>
@@ -656,8 +656,8 @@ const Audit = () => {
             <tbody>
               {shipments.map((s, i) => {
                 const scanned = s.products?.reduce((acc, p) => acc + (p.scannedCount || 0), 0) ?? 0;
-                const expected = s.products?.length ?? 0;
-                const pct = expected > 0 ? Math.round((scanned / expected) * 100) : 0;
+                const expected = s.totalExpected ?? 0;
+                const pct = expected > 0 ? Math.min(100, Math.round((scanned / expected) * 100)) : 0;
 
                 return (
                   <tr
