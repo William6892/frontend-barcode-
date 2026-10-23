@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   ScanBarcode, Search, Truck, User, CreditCard, ChevronRight, ChevronLeft,
-  RefreshCw, CircleCheck, CheckCircle2, XCircle, PackageOpen, History
+  RefreshCw, CircleCheck, CheckCircle2, XCircle, PackageOpen, History, Plus, X, Tag
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -32,22 +32,6 @@ const beep = (ok) => {
   }
 };
 
-const percentOf = (done, total) => (total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0);
-const toneOf = (pct, total) => (total === 0 ? 'open' : pct >= 100 ? 'done' : pct >= 75 ? 'near' : 'active');
-
-// Anillo de progreso por referencia
-const Ring = ({ pct, tone, size = 54 }) => {
-  const r = (size - 8) / 2;
-  const c = 2 * Math.PI * r;
-  return (
-    <svg width={size} height={size} className={`ring ring--${tone}`} aria-hidden="true">
-      <circle cx={size / 2} cy={size / 2} r={r} className="ring-track" />
-      <circle cx={size / 2} cy={size / 2} r={r} className="ring-fill"
-        strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} />
-    </svg>
-  );
-};
-
 const SEARCH_TYPES = [
   { value: 'all', label: 'Todo' },
   { value: 'number', label: 'Nº envío' },
@@ -70,7 +54,9 @@ const Scanner = () => {
   const [showShipmentSelector, setShowShipmentSelector] = useState(true);
   const [lastResult, setLastResult] = useState(null);
   const [flash, setFlash] = useState(null);
+  const [newRef, setNewRef] = useState(null);
   const inputRef = useRef(null);
+  const newRefInputRef = useRef(null);
 
   // ─── Cargar envíos activos ────────────────────────────────────────────────
   const loadShipments = async () => {
@@ -119,7 +105,6 @@ const Scanner = () => {
         id: p.expectedProductId,
         name: p.name,
         model: p.model,
-        expectedQuantity: p.expectedQuantity || 0,
         scannedCount: p.scannedCount || 0,
         scannedItems: p.scannedItems || []
       }));
@@ -140,9 +125,9 @@ const Scanner = () => {
       allScans.sort((a, b) => b.ts - a.ts);
       setScannedItems(allScans);
 
-      // Si solo queda una referencia por llenar, se deja seleccionada para no hacer clic de más
-      const open = products.filter(p => !(p.expectedQuantity > 0 && p.scannedCount >= p.expectedQuantity));
-      setSelectedProductId(open.length === 1 ? open[0].id : '');
+      // Con una sola referencia no hace falta tocar nada antes de escanear
+      setSelectedProductId(products.length === 1 ? products[0].id : '');
+      setNewRef(products.length === 0 ? { name: '', model: '' } : null);
       setLastResult(null);
       setShowShipmentSelector(false);
     } catch (error) {
@@ -156,9 +141,40 @@ const Scanner = () => {
   const initialShipmentId = searchParams.get('shipmentId');
   useEffect(() => {
     if (initialShipmentId) loadShipmentDetails({ id: initialShipmentId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialShipmentId]);
 
   const showFlash = (ok) => setFlash({ ok, key: Date.now() });
+
+  const selectReference = (id) => {
+    setSelectedProductId(id);
+    setNewRef(null);
+    inputRef.current?.focus();
+  };
+
+  // ─── Agregar referencia en el momento ────────────────────────────────────
+  const openNewRef = () => {
+    setNewRef({ name: '', model: '' });
+    setTimeout(() => newRefInputRef.current?.focus(), 0);
+  };
+
+  const addReference = async (e) => {
+    e.preventDefault();
+    if (!newRef?.name.trim()) return;
+    try {
+      const created = await api.post(`/Shipment/${selectedShipment.id}/products`, {
+        name: newRef.name.trim(),
+        model: newRef.model.trim()
+      });
+      setExpectedProducts(prev => prev.some(p => p.id === created.id)
+        ? prev
+        : [...prev, { id: created.id, name: created.name, model: created.model, scannedCount: 0, scannedItems: [] }]);
+      selectReference(created.id);
+      toast.success(`Referencia ${created.name} lista para escanear`);
+    } catch (error) {
+      toast.error('No se pudo agregar la referencia: ' + error.message);
+    }
+  };
 
   // ─── Escanear producto ────────────────────────────────────────────────────
   const handleScan = async (e) => {
@@ -167,7 +183,7 @@ const Scanner = () => {
     if (!selectedProductId) {
       beep(false);
       showFlash(false);
-      setLastResult({ ok: false, code: barcode.trim(), message: 'Primero toca la referencia que vas a escanear' });
+      setLastResult({ ok: false, code: barcode.trim(), message: 'Primero toca la referencia a la que pertenece este serial' });
       setBarcode('');
       return;
     }
@@ -198,17 +214,11 @@ const Scanner = () => {
 
       beep(true);
       showFlash(true);
-      const expected = response.expectedQuantity || product.expectedQuantity;
-      const isComplete = expected && response.scannedCount >= expected;
       setLastResult({
         ok: true,
         code,
-        message: isComplete
-          ? `${product.name} completo: ${fmt(expected)} unidades`
-          : `${product.name}${expected ? ` · ${fmt(response.scannedCount)} de ${fmt(expected)}` : ''}`,
-        complete: isComplete
+        message: `${product.name} · van ${fmt(response.scannedCount)} de esta referencia`
       });
-      if (isComplete) setSelectedProductId('');
     } catch (error) {
       beep(false);
       showFlash(false);
@@ -225,20 +235,23 @@ const Scanner = () => {
     if (!showShipmentSelector && selectedShipment) {
       inputRef.current?.focus();
       const interval = setInterval(() => {
-        // no roba el foco si el usuario está escribiendo en otro campo
+        // no roba el foco si el usuario está escribiendo en otro campo (p. ej. nueva referencia)
         if (document.activeElement?.tagName !== 'INPUT') inputRef.current?.focus();
       }, 1500);
       return () => clearInterval(interval);
     }
   }, [showShipmentSelector, selectedShipment, selectedProductId]);
 
+  // ─── Cálculos ─────────────────────────────────────────────────────────────
+  const totalScanned = expectedProducts.reduce((sum, p) => sum + (p.scannedCount || 0), 0);
+  const selectedProduct = expectedProducts.find(p => p.id == selectedProductId);
+
   const finishShipment = async () => {
-    if (pendingProducts.length > 0) {
-      const detail = pendingProducts
-        .map(p => `• ${p.name}: ${p.scannedCount}/${p.expectedQuantity}`)
-        .join('\n');
-      if (!window.confirm(`El envío está incompleto:\n${detail}\n\n¿Finalizarlo de todas formas?`)) return;
-    }
+    const detail = expectedProducts
+      .filter(p => p.scannedCount > 0)
+      .map(p => `• ${p.name}: ${fmt(p.scannedCount)} und`)
+      .join('\n');
+    if (!window.confirm(`¿Finalizar ${selectedShipment.shipmentNumber}?\n\n${detail}\n\nTotal: ${fmt(totalScanned)} unidades`)) return;
     try {
       await api.post(`/Shipment/${selectedShipment.id}/complete`);
       toast.success(`Envío ${selectedShipment.shipmentNumber} finalizado con ${fmt(totalScanned)} unidades`);
@@ -248,13 +261,6 @@ const Scanner = () => {
       toast.error('Error al finalizar el envío: ' + error.message);
     }
   };
-
-  // ─── Cálculos ─────────────────────────────────────────────────────────────
-  const totalScanned = expectedProducts.reduce((sum, p) => sum + (p.scannedCount || 0), 0);
-  const totalExpected = expectedProducts.reduce((sum, p) => sum + (p.expectedQuantity || 0), 0);
-  const progressPercent = percentOf(totalScanned, totalExpected);
-  const pendingProducts = expectedProducts.filter(p => p.expectedQuantity > 0 && p.scannedCount < p.expectedQuantity);
-  const selectedProduct = expectedProducts.find(p => p.id == selectedProductId);
 
   // ─── SELECTOR DE ENVÍO ────────────────────────────────────────────────────
   if (showShipmentSelector) {
@@ -304,29 +310,35 @@ const Scanner = () => {
         ) : (
           <div className="ship-grid">
             {filteredShipments.map(shipment => {
-              const pct = percentOf(shipment.totalScanned, shipment.totalExpected);
-              const tone = toneOf(pct, shipment.totalExpected);
+              const refs = shipment.products ?? [];
               return (
-                <button key={shipment.id} className={`ship-card ship-card--${tone}`}
+                <button key={shipment.id} className="ship-card"
                   onClick={() => loadShipmentDetails(shipment)} disabled={loading}>
                   <div className="ship-card-top">
                     <div>
                       <div className="ship-card-number mono">{shipment.shipmentNumber}</div>
                       <div className="ship-card-carrier">{shipment.carrier || 'Sin transportadora'}</div>
                     </div>
-                    <span className={`pct-badge pct-badge--${tone}`}>
-                      {shipment.totalExpected ? `${pct}%` : 'Abierto'}
-                    </span>
+                    <div className="ship-card-units">
+                      <span className="tabular">{fmt(shipment.totalScanned)}</span>
+                      <small>und</small>
+                    </div>
                   </div>
                   <div className="ship-card-meta">
                     <span><User size={14} /> {shipment.driverName}</span>
                     <span><Truck size={14} /> {shipment.vehiclePlate}</span>
                   </div>
-                  <div className={`progress progress--${tone === 'open' ? 'active' : tone}`}>
-                    <span style={{ width: `${pct}%` }} />
+                  <div className="ref-chips">
+                    {refs.length === 0 && <span className="ref-chip ref-chip--empty">Sin referencias aún</span>}
+                    {refs.slice(0, 3).map(p => (
+                      <span key={p.expectedProductId} className="ref-chip">
+                        {p.name} <strong className="tabular">{fmt(p.scannedCount)}</strong>
+                      </span>
+                    ))}
+                    {refs.length > 3 && <span className="ref-chip ref-chip--more">+{refs.length - 3}</span>}
                   </div>
                   <div className="ship-card-foot">
-                    <span className="tabular"><strong>{fmt(shipment.totalScanned)}</strong> / {shipment.totalExpected ? fmt(shipment.totalExpected) : '—'} und</span>
+                    <span>{refs.length} {refs.length === 1 ? 'referencia' : 'referencias'}</span>
                     <span className="ship-card-go">Escanear <ChevronRight size={15} /></span>
                   </div>
                 </button>
@@ -359,12 +371,9 @@ const Scanner = () => {
           </div>
         </div>
         <div className="guard-total">
-          <div className="guard-total-value tabular">
-            {fmt(totalScanned)}<span> / {totalExpected ? fmt(totalExpected) : '—'}</span>
-          </div>
-          <div className="guard-total-label">unidades cargadas{totalExpected ? ` · ${progressPercent}%` : ''}</div>
-          <div className={`progress progress--dark progress--${toneOf(progressPercent, totalExpected) === 'open' ? 'active' : toneOf(progressPercent, totalExpected)}`}>
-            <span style={{ width: `${progressPercent}%` }} />
+          <div key={totalScanned} className="guard-total-value tabular bump">{fmt(totalScanned)}</div>
+          <div className="guard-total-label">
+            unidades cargadas en {expectedProducts.length} {expectedProducts.length === 1 ? 'referencia' : 'referencias'}
           </div>
         </div>
       </header>
@@ -373,38 +382,64 @@ const Scanner = () => {
         <section className="guard-main">
           <div className="guard-step">
             <span className="step-num">1</span>
-            <span>Toca la referencia que vas a cargar</span>
+            <span>Toca la referencia del equipo que vas a escanear</span>
           </div>
           <div className="ref-grid">
             {expectedProducts.map(product => {
               const isSelected = selectedProductId == product.id;
-              const pct = percentOf(product.scannedCount, product.expectedQuantity);
-              const tone = toneOf(pct, product.expectedQuantity);
-              const isComplete = tone === 'done';
               return (
                 <button
                   key={product.id}
                   type="button"
-                  disabled={isComplete}
-                  className={`ref-card ref-card--${tone} ${isSelected ? 'is-selected' : ''}`}
-                  onClick={() => { setSelectedProductId(product.id); inputRef.current?.focus(); }}
+                  className={`ref-card ${isSelected ? 'is-selected' : ''}`}
+                  onClick={() => selectReference(product.id)}
                   aria-pressed={isSelected}
                 >
-                  <div className="ref-ring">
-                    <Ring pct={product.expectedQuantity ? pct : 0} tone={tone} />
-                    {isComplete ? <CheckCircle2 size={20} className="ref-ring-icon" /> : <span className="ref-ring-pct">{product.expectedQuantity ? `${pct}%` : '∞'}</span>}
-                  </div>
+                  <span className="ref-icon"><Tag size={20} /></span>
                   <div className="ref-info">
                     <div className="ref-name">{product.name}</div>
-                    <div className="ref-model mono">{product.model}</div>
+                    {product.model && <div className="ref-model mono">{product.model}</div>}
                   </div>
-                  <div className="ref-count tabular">
+                  <div key={product.scannedCount} className="ref-count tabular bump">
                     {fmt(product.scannedCount)}
-                    {product.expectedQuantity > 0 && <span>/ {fmt(product.expectedQuantity)}</span>}
+                    <span>und</span>
                   </div>
                 </button>
               );
             })}
+
+            {newRef ? (
+              <form className="ref-card ref-new-form" onSubmit={addReference}>
+                <input
+                  ref={newRefInputRef}
+                  className="ref-new-input"
+                  placeholder="Referencia (ej: Galaxy S25 Ultra)"
+                  value={newRef.name}
+                  onChange={e => setNewRef({ ...newRef, name: e.target.value })}
+                  autoFocus
+                />
+                <input
+                  className="ref-new-input mono"
+                  placeholder="Modelo (opcional)"
+                  value={newRef.model}
+                  onChange={e => setNewRef({ ...newRef, model: e.target.value })}
+                />
+                <div className="ref-new-actions">
+                  <button type="submit" className="ref-new-save" disabled={!newRef.name.trim()}>
+                    <Plus size={16} /> Agregar
+                  </button>
+                  {expectedProducts.length > 0 && (
+                    <button type="button" className="ref-new-cancel" onClick={() => setNewRef(null)} aria-label="Cancelar">
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </form>
+            ) : (
+              <button type="button" className="ref-card ref-add" onClick={openNewRef}>
+                <Plus size={20} /> Nueva referencia
+              </button>
+            )}
           </div>
 
           <div className="guard-step">
@@ -427,7 +462,7 @@ const Scanner = () => {
             />
             <span className="scan-status">
               <span className="scan-status-dot" />
-              {readyToScan ? `Cargando: ${selectedProduct?.name}` : 'Sin referencia'}
+              {readyToScan ? `Sumando a: ${selectedProduct?.name}` : 'Sin referencia'}
             </span>
           </form>
 
@@ -465,10 +500,9 @@ const Scanner = () => {
             )}
           </div>
 
-          <button className={`finish-btn ${pendingProducts.length === 0 && totalScanned > 0 ? 'is-ready' : ''}`}
-            onClick={finishShipment} disabled={totalScanned === 0}>
+          <button className="finish-btn" onClick={finishShipment} disabled={totalScanned === 0}>
             <CircleCheck size={20} />
-            {pendingProducts.length === 0 && totalScanned > 0 ? 'Finalizar envío' : 'Finalizar envío (incompleto)'}
+            Finalizar envío · {fmt(totalScanned)} und
           </button>
         </aside>
       </div>

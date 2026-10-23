@@ -11,7 +11,7 @@ const ShipmentCreation = () => {
   const [formData, setFormData] = useState({
     shipmentNumber: '', carrier: '', driverName: '', driverDocument: '', vehiclePlate: '', vehicleModel: '', scheduledDate: ''
   });
-  const [products, setProducts] = useState([{ name: '', model: '', expectedQuantity: '' }]);
+  const [products, setProducts] = useState([{ name: '', model: '' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -22,8 +22,8 @@ const ShipmentCreation = () => {
     setProducts(newProds);
   };
 
-  const addProduct = () => setProducts([...products, { name: '', model: '', expectedQuantity: '' }]);
-  const totalUnits = products.reduce((sum, p) => sum + (parseInt(p.expectedQuantity) || 0), 0);
+  const addProduct = () => setProducts([...products, { name: '', model: '' }]);
+  const namedProducts = products.filter(p => p.name.trim() !== '').length;
   const removeProduct = (index) => setProducts(products.filter((_, i) => i !== index));
 
   const handleSubmit = async (e) => {
@@ -35,7 +35,7 @@ const ShipmentCreation = () => {
         scheduledDate: formData.scheduledDate ? new Date(formData.scheduledDate).toISOString() : null,
         expectedProducts: products
           .filter(p => p.name.trim() !== '')
-          .map(p => ({ ...p, expectedQuantity: parseInt(p.expectedQuantity) || 0 }))
+          .map(p => ({ name: p.name.trim(), model: p.model.trim() }))
       };
       const res = await api.post('/Shipment', payload);
       toast.success(`✅ Envío ${res.shipmentNumber || formData.shipmentNumber} creado`);
@@ -64,7 +64,7 @@ const ShipmentCreation = () => {
           <div className="header-stats">
             <span className="stat-item">
               <Package size={16} />
-              {products.length} referencias · {totalUnits} und
+              {namedProducts} {namedProducts === 1 ? 'referencia' : 'referencias'}
             </span>
           </div>
         </header>
@@ -187,15 +187,15 @@ const ShipmentCreation = () => {
                 <Package size={18} />
               </div>
               <div>
-                <h3 className="section-title">Equipos Esperados</h3>
-                <p className="section-subtitle">Productos que llevará el envío</p>
+                <h3 className="section-title">Referencias (opcional)</h3>
+                <p className="section-subtitle">Si ya sabes qué sale, agrégalas. Si no, el guarda las agrega mientras escanea.</p>
               </div>
               <button 
                 type="button" 
                 onClick={addProduct} 
                 className="btn-add-product"
               >
-                <Plus size={18} /> Añadir Equipo
+                <Plus size={18} /> Añadir referencia
               </button>
             </div>
             
@@ -206,9 +206,8 @@ const ShipmentCreation = () => {
                   
                   <div className="product-fields">
                     <div className="input-group product-input">
-                      <label className="input-label">Nombre del Equipo</label>
+                      <label className="input-label">Referencia</label>
                       <input 
-                        required 
                         placeholder="Ej: S25 Ultra" 
                         type="text" 
                         className="input-field" 
@@ -219,25 +218,11 @@ const ShipmentCreation = () => {
                     <div className="input-group product-input">
                       <label className="input-label">Modelo</label>
                       <input 
-                        required 
                         placeholder="Ej: SM-S938B" 
                         type="text" 
                         className="input-field" 
                         value={prod.model} 
                         onChange={(e) => handleProductChange(index, 'model', e.target.value)}
-                      />
-                    </div>
-                    <div className="input-group product-input">
-                      <label className="input-label">Unidades a despachar</label>
-                      <input
-                        required
-                        placeholder="Ej: 1200"
-                        type="number"
-                        min="1"
-                        max="100000"
-                        className="input-field"
-                        value={prod.expectedQuantity}
-                        onChange={(e) => handleProductChange(index, 'expectedQuantity', e.target.value)}
                       />
                     </div>
                   </div>

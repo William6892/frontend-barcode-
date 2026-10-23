@@ -238,9 +238,7 @@ const Audit = () => {
   // ─── DETALLE ──────────────────────────────────────────────────────────────
   if (selectedShipment) {
     const products = selectedShipment.products || [];
-    const totalExpected = products.reduce((s, p) => s + (p.expectedQuantity || 0), 0);
     const totalScanned = products.reduce((s, p) => s + (p.scannedCount || 0), 0);
-    const pct = totalExpected > 0 ? Math.min(100, Math.round((totalScanned / totalExpected) * 100)) : 0;
 
     return (
       <div className="animate-slide-up" style={{ maxWidth: '900px', margin: '0 auto', paddingBottom: '3rem' }}>
@@ -324,14 +322,13 @@ const Audit = () => {
             </div>
           </div>
 
-          {/* Progreso */}
+          {/* Total escaneado */}
           <div style={{ marginTop: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
-              <span>Unidades escaneadas</span>
-              <span style={{ fontWeight: 600 }}>{totalScanned} / {totalExpected} ({pct}%)</span>
-            </div>
-            <div style={{ background: 'var(--bg-app)', borderRadius: 'var(--radius-full)', height: '8px', overflow: 'hidden' }}>
-              <div style={{ width: `${pct}%`, background: pct === 100 ? 'var(--color-success)' : 'var(--color-primary)', height: '100%', borderRadius: 'var(--radius-full)', transition: 'width 0.3s' }} />
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                {totalScanned.toLocaleString('es-CO')}
+              </span>
+              unidades escaneadas en {products.length} {products.length === 1 ? 'referencia' : 'referencias'}
             </div>
           </div>
         </div>
@@ -646,7 +643,7 @@ const Audit = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ background: 'var(--bg-surface-active)' }}>
               <tr>
-                {['Envío', 'Conductor / Vehículo', 'Transportadora', 'Progreso', 'Estado', ''].map((h, i) => (
+                {['Envío', 'Conductor / Vehículo', 'Transportadora', 'Unidades', 'Estado', ''].map((h, i) => (
                   <th key={i} style={{ padding: '1rem 1.25rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
                     {h}
                   </th>
@@ -656,8 +653,6 @@ const Audit = () => {
             <tbody>
               {shipments.map((s, i) => {
                 const scanned = s.products?.reduce((acc, p) => acc + (p.scannedCount || 0), 0) ?? 0;
-                const expected = s.totalExpected ?? 0;
-                const pct = expected > 0 ? Math.min(100, Math.round((scanned / expected) * 100)) : 0;
 
                 return (
                   <tr
@@ -694,13 +689,12 @@ const Audit = () => {
                       </div>
                     </td>
 
-                    <td style={{ padding: '1rem 1.25rem', minWidth: '140px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '5px' }}>
-                        <span>{scanned} / {expected} uds</span>
-                        <span>{pct}%</span>
+                    <td style={{ padding: '1rem 1.25rem', minWidth: '110px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', fontVariantNumeric: 'tabular-nums' }}>
+                        {scanned.toLocaleString('es-CO')} <span style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--text-muted)' }}>und</span>
                       </div>
-                      <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-full)', height: '5px', overflow: 'hidden' }}>
-                        <div style={{ width: `${pct}%`, background: pct === 100 ? 'var(--color-success)' : 'var(--color-primary)', height: '100%', borderRadius: 'var(--radius-full)' }} />
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {s.products?.length ?? 0} {(s.products?.length ?? 0) === 1 ? 'referencia' : 'referencias'}
                       </div>
                     </td>
 

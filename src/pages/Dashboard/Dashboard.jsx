@@ -118,7 +118,6 @@ const RankList = ({ items, unit }) => {
   );
 };
 
-const progressTone = (pct) => (pct >= 100 ? 'done' : pct >= 75 ? 'near' : 'active');
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -153,9 +152,9 @@ const Dashboard = () => {
   const scansByHour = stats?.scansByHour ?? [];
   const lastHour = scansByHour[scansByHour.length - 1]?.count ?? 0;
 
-  const shipmentsWithProgress = activeShipments
-    .map(s => ({ ...s, pct: s.totalExpected > 0 ? Math.round((s.totalScanned / s.totalExpected) * 100) : 0 }))
-    .sort((a, b) => b.pct - a.pct);
+  // Sin cantidades esperadas: la barra compara cada envío contra el que más unidades lleva
+  const shipmentsByUnits = [...activeShipments].sort((a, b) => b.totalScanned - a.totalScanned);
+  const maxUnits = Math.max(1, ...shipmentsByUnits.map(s => s.totalScanned));
 
   return (
     <div className="dashboard animate-slide-up">
@@ -224,29 +223,31 @@ const Dashboard = () => {
           <div className="panel-head">
             <div>
               <h3 className="panel-title">Envíos en curso</h3>
-              <p className="panel-sub">{activeShipments.length} activos · ordenados por avance</p>
+              <p className="panel-sub">{activeShipments.length} activos · ordenados por unidades cargadas</p>
             </div>
             <button className="link-btn" onClick={() => navigate('/scanner')}>
               Ir al escáner <ArrowRight size={14} />
             </button>
           </div>
-          {shipmentsWithProgress.length === 0 ? (
+          {shipmentsByUnits.length === 0 ? (
             <div className="empty-state">No hay envíos activos</div>
           ) : (
             <ul className="ship-list">
-              {shipmentsWithProgress.slice(0, 6).map(s => (
+              {shipmentsByUnits.slice(0, 6).map(s => (
                 <li key={s.id}>
                   <button className="ship-row" onClick={() => navigate(`/scanner?shipmentId=${s.id}`)}>
                     <div className="ship-main">
                       <span className="ship-number mono">{s.shipmentNumber}</span>
-                      <span className="ship-meta">{s.carrier} · {s.vehiclePlate}</span>
+                      <span className="ship-meta">
+                        {s.carrier} · {s.vehiclePlate} · {s.products?.length ?? 0} ref.
+                      </span>
                     </div>
                     <div className="ship-progress">
-                      <div className={`progress progress--${progressTone(s.pct)}`}>
-                        <span style={{ width: `${Math.min(100, s.pct)}%` }} />
+                      <div className="progress">
+                        <span style={{ width: `${(s.totalScanned / maxUnits) * 100}%` }} />
                       </div>
                       <span className="ship-count tabular">
-                        {fmt(s.totalScanned)}<small> / {s.totalExpected ? fmt(s.totalExpected) : '—'}</small>
+                        {fmt(s.totalScanned)}<small> und</small>
                       </span>
                     </div>
                   </button>
